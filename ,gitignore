@@ -1,0 +1,5 @@
+# Arquivos locais e de ambiente
+.env
+.env.local
+*.log
+.DS_Store
