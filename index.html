@@ -70,7 +70,6 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /* TRANSITION E ANIMAÇÃO DA STATE MACHINE */
     .widget-animated {
       transition: opacity 0.4s ease-out, transform 0.4s ease-out;
     }
@@ -84,20 +83,27 @@
       transform: translateY(0) scale(1);
     }
 
-    /* CONTAINER COM SCROLL AUTOMÁTICO EM LOOP */
-    .scroll-container {
-      max-height: 160px;
+    /* CONTAINER COM LIMITE DE ALTURA PARA O OBS NÃO POLUIR A TELA */
+    .overlay-box-bounded {
+      max-width: 768px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    /* CONTAINER DE SCROLL CONTÍNUO DOS DEMAIS APOSTADORES */
+    .runner-up-scroll {
+      max-height: 75px;
       overflow: hidden;
       position: relative;
     }
-    .scroll-container:hover .scroll-content {
-      animation-play-state: paused;
-    }
-    .scroll-content {
+    .runner-up-content {
       display: flex;
       flex-direction: column;
-      gap: 0.375rem;
-      animation: scrollVertical 10s linear infinite;
+      gap: 0.25rem;
+      animation: scrollVertical 8s linear infinite;
+    }
+    .runner-up-scroll:hover .runner-up-content {
+      animation-play-state: paused;
     }
 
     ::-webkit-scrollbar { width: 4px; }
@@ -115,9 +121,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">Twitch Engine v4</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v4.3 Compact Grid</span>
         </h1>
-        <p class="text-xs text-gray-400">Estado inicial oculto, Top 3 e auto-hide de 10s</p>
+        <p class="text-xs text-gray-400">Limites de Tamanho para OBS, Suporte de 2 a 10 opções</p>
       </div>
     </div>
 
@@ -172,7 +178,7 @@
 
             <div>
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Opções</label>
+                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Opções (2 a 10)</label>
                 <button type="button" onclick="addOptionInput()" class="text-xs text-twitch-purple hover:underline flex items-center gap-1 font-semibold">
                   <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Adicionar Opção
                 </button>
@@ -228,20 +234,19 @@
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
-            <div id="overlay-widget-container" class="w-full max-w-2xl widget-animated widget-hidden"></div>
+            <div id="overlay-widget-container" class="w-full overlay-box-bounded widget-animated widget-hidden"></div>
           </div>
         </div>
       </section>
 
     </div>
 
-    <!-- MODO STANDALONE PARA OBS BROWSER SOURCE -->
+    <!-- STANDALONE OBS VIEW (ALTURA E LARGURA COMPACTAS) -->
     <div id="overlay-only-view" class="hidden min-h-screen flex items-center justify-center p-4">
-      <div id="overlay-standalone-container" class="w-full max-w-3xl widget-animated widget-hidden"></div>
+      <div id="overlay-standalone-container" class="w-full overlay-box-bounded widget-animated widget-hidden"></div>
     </div>
   </main>
 
-  <!-- TOAST -->
   <div id="toast" class="fixed bottom-5 right-5 bg-twitch-purple text-white px-4 py-3 rounded-xl shadow-2xl transition-all transform translate-y-20 opacity-0 flex items-center gap-2 text-sm font-semibold z-50">
     <i data-lucide="check-circle" class="w-5 h-5"></i>
     <span id="toast-message">Mensagem</span>
@@ -258,13 +263,16 @@
       { name: 'Ciano', hex: '#00F5D4', bg: 'bg-[#00F5D4]', text: 'text-[#00F5D4]', border: 'border-[#00F5D4]' },
       { name: 'Amarelo', hex: '#FEE440', bg: 'bg-[#FEE440]', text: 'text-[#FEE440]', border: 'border-[#FEE440]' },
       { name: 'Roxo', hex: '#9146FF', bg: 'bg-[#9146FF]', text: 'text-[#9146FF]', border: 'border-[#9146FF]' },
-      { name: 'Laranja', hex: '#FF9F1C', bg: 'bg-[#FF9F1C]', text: 'text-[#FF9F1C]', border: 'border-[#FF9F1C]' }
+      { name: 'Laranja', hex: '#FF9F1C', bg: 'bg-[#FF9F1C]', text: 'text-[#FF9F1C]', border: 'border-[#FF9F1C]' },
+      { name: 'Verde', hex: '#10B981', bg: 'bg-[#10B981]', text: 'text-[#10B981]', border: 'border-[#10B981]' },
+      { name: 'Vermelho', hex: '#EF4444', bg: 'bg-[#EF4444]', text: 'text-[#EF4444]', border: 'border-[#EF4444]' },
+      { name: 'Violeta', hex: '#8B5CF6', bg: 'bg-[#8B5CF6]', text: 'text-[#8B5CF6]', border: 'border-[#8B5CF6]' },
+      { name: 'Índigo', hex: '#6366F1', bg: 'bg-[#6366F1]', text: 'text-[#6366F1]', border: 'border-[#6366F1]' }
     ];
 
-    // ESTADO INICIAL COMPLETAMENTE OCULTO (IDLE + ISVISIBLE FALSE)
     let predictionState = {
       title: "",
-      status: "IDLE", // IDLE, ACTIVE, LOCKED, RESOLVED, CANCELLED
+      status: "IDLE",
       totalDuration: 0,
       remainingTime: 0,
       winningOptionId: null,
@@ -363,10 +371,7 @@
       }
     }
 
-    // PROCESSAMENTO DOS EVENTOS TWITCH
     function handleTwitchPredictionNotification(type, event) {
-      
-      // 1. INÍCIO DO PALPITE
       if (type === 'channel.prediction.begin') {
         resetStateMachine('ACTIVE');
 
@@ -375,6 +380,7 @@
           twitchId: o.id || '',
           title: o.title,
           votes: o.channel_points || 0,
+          usersCount: o.users || 0,
           color: OPTION_COLORS[idx % OPTION_COLORS.length],
           topPredictors: []
         }));
@@ -399,13 +405,13 @@
         showToast(`Novo Palpite: "${event.title}"`);
       }
 
-      // 2. PROGRESSO DE VOTOS
       if (type === 'channel.prediction.progress') {
         const mappedOptions = event.outcomes.map((o, idx) => ({
           id: String(idx + 1),
           twitchId: o.id || '',
           title: o.title,
           votes: o.channel_points || 0,
+          usersCount: o.users || 0,
           color: OPTION_COLORS[idx % OPTION_COLORS.length],
           topPredictors: o.top_predictors ? o.top_predictors.map(p => ({
             name: p.user_name || p.user_login || 'Usuário',
@@ -428,7 +434,6 @@
         });
       }
 
-      // 3. RESULTADO / FIM DO PALPITE
       if (type === 'channel.prediction.end') {
         clearTimeout(autoHideTimeout);
         
@@ -459,7 +464,11 @@
               lost: isWinnerOpt ? 0 : (p.channel_points_used || 0)
             }));
           }
-          return { ...opt, topPredictors: predictors };
+          return { 
+            ...opt, 
+            usersCount: twitchOutcome ? (twitchOutcome.users || opt.usersCount) : opt.usersCount,
+            topPredictors: predictors 
+          };
         });
 
         updateState({
@@ -474,7 +483,6 @@
           showToast("Palpite Encerrado!");
         }
 
-        // ESCONDE APÓS 10 SEGUNDOS EXIBINDO O RESULTADO E RESETA
         scheduleAutoHide(10000);
       }
     }
@@ -521,7 +529,7 @@
             predictionState.remainingTime = 0;
             predictionState.status = 'LOCKED';
             clearInterval(timerInterval);
-            showToast("Votações enceradas!");
+            showToast("Votações encerradas!");
             updateState(predictionState);
             scheduleAutoHide(10000);
           }
@@ -554,9 +562,11 @@
 
     function addOptionInput() {
       const inputs = Array.from(document.querySelectorAll('.option-input')).map(i => i.value);
-      if (inputs.length < 6) {
+      if (inputs.length < 10) {
         inputs.push(`Opção ${inputs.length + 1}`);
         renderOptionInputs(inputs);
+      } else {
+        showToast("Limite máximo de 10 opções atingido!");
       }
     }
 
@@ -586,6 +596,7 @@
         twitchId: '',
         title: input.value || `Opção ${idx + 1}`,
         votes: 0,
+        usersCount: 0,
         color: OPTION_COLORS[idx % OPTION_COLORS.length],
         topPredictors: []
       }));
@@ -624,7 +635,11 @@
       if (predictionState.status !== 'ACTIVE') return;
       const updatedOptions = predictionState.options.map(opt => {
         if (opt.id === optionId) {
-          return { ...opt, votes: opt.votes + amount };
+          return { 
+            ...opt, 
+            votes: opt.votes + amount,
+            usersCount: (opt.usersCount || 0) + 1
+          };
         }
         return opt;
       });
@@ -634,27 +649,30 @@
     function resolvePrediction(winnerId) {
       clearTimeout(autoHideTimeout);
       
-      // MOCK DE GANHADORES/PERDEDORES NO TESTE LOCAL
       const updatedOptions = predictionState.options.map(opt => {
         if (opt.id === winnerId) {
           return {
             ...opt,
+            usersCount: opt.usersCount || 14,
             topPredictors: [
               { name: 'Gaules', points: 5000, won: 12500 },
               { name: 'Alanzoka', points: 3500, won: 8750 },
               { name: 'Guifs', points: 2000, won: 5000 },
               { name: 'Mount', points: 1500, won: 3750 },
-              { name: 'Cellbit', points: 1000, won: 2500 }
+              { name: 'Cellbit', points: 1000, won: 2500 },
+              { name: 'Rayan', points: 800, won: 2000 }
             ]
           };
         } else {
           return {
             ...opt,
+            usersCount: opt.usersCount || 8,
             topPredictors: [
               { name: 'Casimiro', points: 4200, lost: 4200 },
               { name: 'Nobru', points: 3000, lost: 3000 },
               { name: 'PaulinhoOkb', points: 2000, lost: 2000 },
-              { name: 'Coringa', points: 1200, lost: 1200 }
+              { name: 'Coringa', points: 1200, lost: 1200 },
+              { name: 'Loud_Luan', points: 800, lost: 800 }
             ]
           };
         }
@@ -728,7 +746,7 @@
       }
     }
 
-    // OVERLAY RENDERER (UTILIZADO TANTO NO ADMIN QUANTO NO OBS STANDALONE)
+    // RENDERIZADOR DO OVERLAY
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -737,15 +755,16 @@
         ? 'widget-visible' 
         : 'widget-hidden';
 
-      if (containerDual) containerDual.className = `w-full max-w-2xl widget-animated ${visibilityClass}`;
-      if (containerStandalone) containerStandalone.className = `w-full max-w-3xl widget-animated ${visibilityClass}`;
+      if (containerDual) containerDual.className = `w-full overlay-box-bounded widget-animated ${visibilityClass}`;
+      if (containerStandalone) containerStandalone.className = `w-full overlay-box-bounded widget-animated ${visibilityClass}`;
 
       if (!predictionState.options || predictionState.options.length === 0) {
         return;
       }
 
       const totalVotes = predictionState.options.reduce((acc, curr) => acc + curr.votes, 0);
-      
+      const totalParticipants = predictionState.options.reduce((acc, curr) => acc + (curr.usersCount || 0), 0);
+
       const mins = Math.floor(predictionState.remainingTime / 60);
       const secs = predictionState.remainingTime % 60;
       const formattedTime = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -772,162 +791,196 @@
       let statusBadge = '';
       if (predictionState.status === 'ACTIVE') {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-purple-900/60 text-purple-200 border border-purple-500/40 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+          <div class="flex items-center gap-1.5 bg-purple-900/60 text-purple-200 border border-purple-500/40 px-3 py-1 rounded-full text-xs font-bold animate-pulse whitespace-nowrap">
             <i data-lucide="clock" class="w-3.5 h-3.5 text-twitch-accent"></i>
             <span>${formattedTime}</span>
           </div>
         `;
       } else if (predictionState.status === 'LOCKED') {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-amber-900/60 text-amber-200 border border-amber-500/40 px-3 py-1 rounded-full text-xs font-bold">
+          <div class="flex items-center gap-1.5 bg-amber-900/60 text-amber-200 border border-amber-500/40 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
             <i data-lucide="lock" class="w-3.5 h-3.5"></i>
             <span>VOTAÇÕES ENCERRADAS</span>
           </div>
         `;
       } else if (predictionState.status === 'RESOLVED') {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-emerald-900/60 text-emerald-200 border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold">
+          <div class="flex items-center gap-1.5 bg-emerald-900/60 text-emerald-200 border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
             <i data-lucide="trophy" class="w-3.5 h-3.5"></i>
             <span>RESULTADO FINAL</span>
           </div>
         `;
       } else {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-red-900/60 text-red-200 border border-red-500/40 px-3 py-1 rounded-full text-xs font-bold">
+          <div class="flex items-center gap-1.5 bg-red-900/60 text-red-200 border border-red-500/40 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
             <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
             <span>CANCELADO</span>
           </div>
         `;
       }
 
-      // PAINEL DE RESULTADO (TOP 3 + SCROLL VERTICAL CONTINUO ESTILO REDDIT)
+      // PAINEL DE RESULTADO (REDESENHADO COM PODIUM TOP 3 + SCROLL DOS DEMAIS)
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
-        // ORDENA E RENDERIZA GANHADORES
+        // --- PROCESSA GANHADORES ---
         const winnersArray = winnerOption.topPredictors || [];
         const sortedWinners = [...winnersArray].sort((a, b) => (b.won || b.points) - (a.won || a.points));
         
-        let winnersCardsHTML = '';
-        if (sortedWinners.length > 0) {
-          // Duplica os elementos se houver mais de 3 para garantir o scroll contínuo
-          const listToRender = sortedWinners.length > 3 ? [...sortedWinners, ...sortedWinners] : sortedWinners;
-          
-          winnersCardsHTML = listToRender.map((p, idx) => {
-            const originalIndex = (idx % sortedWinners.length) + 1;
+        const top3Winners = sortedWinners.slice(0, 3);
+        const restWinners = sortedWinners.slice(3);
+
+        let top3WinnersHTML = top3Winners.map((p, idx) => {
+          const rank = idx + 1;
+          const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
+          const lucroLiquido = Math.max(0, totalGanhos - p.points);
+
+          let badgeColor = "bg-amber-400 text-black border-amber-300";
+          let rowBg = "bg-emerald-950/80 border-emerald-500/40";
+          if (rank === 2) { badgeColor = "bg-gray-300 text-black border-gray-100"; rowBg = "bg-emerald-950/60 border-emerald-500/30"; }
+          if (rank === 3) { badgeColor = "bg-amber-700 text-white border-amber-600"; rowBg = "bg-emerald-950/50 border-emerald-500/20"; }
+
+          return `
+            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 text-xs ${rowBg} border px-2 py-1 rounded-lg shadow-sm">
+              <div class="w-4 h-4 rounded-full ${badgeColor} border font-black text-[9px] flex items-center justify-center shrink-0">
+                ${rank}º
+              </div>
+              <div class="min-w-0">
+                <div class="font-bold text-white truncate text-xs">${escapeHtml(p.name)}</div>
+                <div class="text-[8px] text-gray-400 truncate">Apostou ${p.points.toLocaleString('pt-BR')} pts</div>
+              </div>
+              <div class="text-right whitespace-nowrap pl-2">
+                <span class="font-extrabold text-emerald-400 block text-xs">+${totalGanhos.toLocaleString('pt-BR')} pts</span>
+                <span class="text-[8px] text-emerald-300/80 font-semibold">(+${lucroLiquido.toLocaleString('pt-BR')} lucro)</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        let restWinnersTickerHTML = '';
+        if (restWinners.length > 0) {
+          const listToScroll = restWinners.length > 2 ? [...restWinners, ...restWinners] : restWinners;
+          const itemsHTML = listToScroll.map((p, idx) => {
+            const realRank = (idx % restWinners.length) + 4;
             const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
-            const lucroLiquido = Math.max(0, totalGanhos - p.points);
-
-            let rankBadge = '';
-            if (originalIndex === 1) rankBadge = '<span class="bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded">1º</span>';
-            else if (originalIndex === 2) rankBadge = '<span class="bg-gray-300 text-black text-[9px] font-black px-1.5 py-0.2 rounded">2º</span>';
-            else if (originalIndex === 3) rankBadge = '<span class="bg-amber-700 text-white text-[9px] font-black px-1.5 py-0.2 rounded">3º</span>';
-
             return `
-              <div class="flex items-center justify-between text-xs bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg shrink-0">
-                <div class="flex items-center gap-1.5">
-                  ${rankBadge}
-                  <div>
-                    <span class="font-bold text-white flex items-center gap-1">
-                      ${escapeHtml(p.name)}
-                    </span>
-                    <span class="text-[9px] text-gray-400 block">Apostou ${p.points.toLocaleString('pt-BR')} pts</span>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <span class="font-extrabold text-emerald-400 block">+${totalGanhos.toLocaleString('pt-BR')} pts</span>
-                  <span class="text-[9px] text-emerald-300/80 font-semibold">(+${lucroLiquido.toLocaleString('pt-BR')} lucro)</span>
-                </div>
+              <div class="flex items-center justify-between text-[10px] bg-emerald-950/30 border border-emerald-500/10 px-2 py-0.5 rounded">
+                <span class="text-gray-300 truncate"><strong class="text-emerald-400/80 mr-1">${realRank}º</strong> ${escapeHtml(p.name)}</span>
+                <span class="text-emerald-400 font-bold whitespace-nowrap pl-2">+${totalGanhos.toLocaleString('pt-BR')} pts</span>
               </div>
             `;
           }).join('');
-        } else {
-          winnersCardsHTML = `<div class="text-[11px] text-gray-400 italic p-2">Todos da opção "${escapeHtml(winnerOption.title)}" ganharam!</div>`;
+
+          restWinnersTickerHTML = `
+            <div class="mt-1 pt-1 border-t border-emerald-500/20">
+              <div class="text-[8px] uppercase font-bold text-emerald-400/70 mb-0.5">Outros Vencedores</div>
+              <div class="runner-up-scroll rounded bg-black/40 p-1">
+                <div class="runner-up-content">
+                  ${itemsHTML}
+                </div>
+              </div>
+            </div>
+          `;
         }
 
-        // ORDENA E RENDERIZA PERDEDORES
+        // --- PROCESSA PERDEDORES ---
         const loserPredictors = loserOptions.flatMap(o => o.topPredictors || []);
         const sortedLosers = [...loserPredictors].sort((a, b) => (b.points || b.lost) - (a.points || a.lost));
 
-        let losersCardsHTML = '';
-        if (sortedLosers.length > 0) {
-          const listToRender = sortedLosers.length > 3 ? [...sortedLosers, ...sortedLosers] : sortedLosers;
+        const top3Losers = sortedLosers.slice(0, 3);
+        const restLosers = sortedLosers.slice(3);
 
-          losersCardsHTML = listToRender.map((p, idx) => {
-            const originalIndex = (idx % sortedLosers.length) + 1;
+        let top3LosersHTML = top3Losers.map((p, idx) => {
+          const rank = idx + 1;
+          const lostPts = p.points || p.lost || 0;
+
+          return `
+            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 text-xs bg-red-950/50 border border-red-500/30 px-2 py-1 rounded-lg shadow-sm">
+              <div class="w-4 h-4 rounded-full bg-red-900/80 text-red-200 border border-red-500/40 font-black text-[9px] flex items-center justify-center shrink-0">
+                ${rank}º
+              </div>
+              <div class="min-w-0">
+                <div class="font-bold text-gray-200 truncate text-xs">${escapeHtml(p.name)}</div>
+                <div class="text-[8px] text-gray-400 truncate">Aposta Perfeita</div>
+              </div>
+              <div class="text-right whitespace-nowrap pl-2">
+                <span class="font-extrabold text-red-400 block text-xs">-${lostPts.toLocaleString('pt-BR')} pts</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        let restLosersTickerHTML = '';
+        if (restLosers.length > 0) {
+          const listToScroll = restLosers.length > 2 ? [...restLosers, ...restLosers] : restLosers;
+          const itemsHTML = listToScroll.map((p, idx) => {
+            const realRank = (idx % restLosers.length) + 4;
             const lostPts = p.points || p.lost || 0;
-
-            let rankBadge = '';
-            if (originalIndex === 1) rankBadge = '<span class="bg-red-500/30 text-red-300 text-[9px] font-black px-1.5 py-0.2 rounded">1º</span>';
-            else if (originalIndex === 2) rankBadge = '<span class="bg-red-500/20 text-red-300 text-[9px] font-black px-1.5 py-0.2 rounded">2º</span>';
-            else if (originalIndex === 3) rankBadge = '<span class="bg-red-500/20 text-red-300 text-[9px] font-black px-1.5 py-0.2 rounded">3º</span>';
-
             return `
-              <div class="flex items-center justify-between text-xs bg-red-950/60 border border-red-500/30 px-2.5 py-1.5 rounded-lg shrink-0">
-                <div class="flex items-center gap-1.5">
-                  ${rankBadge}
-                  <div>
-                    <span class="font-bold text-gray-300 flex items-center gap-1">
-                      ${escapeHtml(p.name)}
-                    </span>
-                    <span class="text-[9px] text-gray-500 block">Apostou ${lostPts.toLocaleString('pt-BR')} pts</span>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <span class="font-extrabold text-red-400">-${lostPts.toLocaleString('pt-BR')} pts</span>
-                </div>
+              <div class="flex items-center justify-between text-[10px] bg-red-950/30 border border-red-500/10 px-2 py-0.5 rounded">
+                <span class="text-gray-400 truncate"><strong class="text-red-400/80 mr-1">${realRank}º</strong> ${escapeHtml(p.name)}</span>
+                <span class="text-red-400 font-bold whitespace-nowrap pl-2">-${lostPts.toLocaleString('pt-BR')} pts</span>
               </div>
             `;
           }).join('');
-        } else {
-          losersCardsHTML = `<div class="text-[11px] text-gray-400 italic p-2">Os pontos foram distribuídos para a opção vencedora.</div>`;
+
+          restLosersTickerHTML = `
+            <div class="mt-1 pt-1 border-t border-red-500/20">
+              <div class="text-[8px] uppercase font-bold text-red-400/70 mb-0.5">Outros Apostadores</div>
+              <div class="runner-up-scroll rounded bg-black/40 p-1">
+                <div class="runner-up-content">
+                  ${itemsHTML}
+                </div>
+              </div>
+            </div>
+          `;
         }
 
         resultDetailsHTML = `
-          <div class="mb-5 p-4 rounded-xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/40 to-emerald-950/90 border border-emerald-500/40 shadow-lg animate-glow-winner space-y-3">
+          <div class="mb-3 p-3 rounded-xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/40 to-emerald-950/90 border border-emerald-500/40 shadow-lg animate-glow-winner space-y-2">
             
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-1.5">
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 font-bold">
-                  <i data-lucide="coins" class="w-4 h-4"></i>
+                <div class="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+                  <i data-lucide="coins" class="w-3.5 h-3.5"></i>
                 </div>
                 <div>
-                  <div class="text-xs uppercase font-extrabold text-emerald-400 tracking-wider">Resultado da Distribuição</div>
-                  <div class="text-xs text-white">Opção Vencedora: <strong class="text-emerald-300 uppercase">${escapeHtml(winnerOption.title)}</strong></div>
+                  <div class="text-[11px] uppercase font-extrabold text-emerald-400 tracking-wider whitespace-nowrap">Resultado da Distribuição</div>
+                  <div class="text-[11px] text-white">Opção Vencedora: <strong class="text-emerald-300 uppercase">${escapeHtml(winnerOption.title)}</strong> (${winnerOption.usersCount || 0} apostadores)</div>
                 </div>
               </div>
 
-              <div class="bg-black/50 border border-emerald-500/30 px-3 py-1 rounded-xl text-right">
-                <div class="text-[10px] text-gray-400 font-bold uppercase">Retorno p/ 1k pts</div>
-                <div class="text-sm font-black text-emerald-400 font-display">+${returnPer1k.toLocaleString('pt-BR')} pts</div>
+              <div class="bg-black/50 border border-emerald-500/30 px-2.5 py-0.5 rounded-lg text-right whitespace-nowrap">
+                <div class="text-[9px] text-gray-400 font-bold uppercase">Retorno p/ 1k pts</div>
+                <div class="text-xs font-black text-emerald-400 font-display">+${returnPer1k.toLocaleString('pt-BR')} pts</div>
               </div>
             </div>
 
-            <!-- GRADE COM SCROLL VERTICAL CONTÍNUO DOS GANHADORES E PERDEDORES -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <!-- PÓDIOS COM LAYOUT COMPACTO -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-0.5">
               
               <!-- GANHADORES -->
-              <div class="space-y-1.5">
-                <div class="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-                  <i data-lucide="trophy" class="w-3 h-3"></i> Top Ganhadores (+${loserVotes.toLocaleString('pt-BR')} pts divididos)
+              <div class="space-y-1">
+                <div class="text-[9px] font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between whitespace-nowrap">
+                  <span class="flex items-center gap-1"><i data-lucide="trophy" class="w-3 h-3"></i> Pódio Ganhadores</span>
+                  <span class="text-[8px] text-emerald-300/70 font-normal">+${loserVotes.toLocaleString('pt-BR')} pts divididos</span>
                 </div>
-                <div class="scroll-container rounded-lg bg-black/40 p-1">
-                  <div class="scroll-content ${sortedWinners.length <= 3 ? '[animation:none]' : ''}">
-                    ${winnersCardsHTML}
-                  </div>
+                <div class="space-y-1">
+                  ${top3WinnersHTML || '<div class="text-[10px] text-gray-400 italic">Sem dados de ganhadores</div>'}
                 </div>
+                ${restWinnersTickerHTML}
               </div>
 
               <!-- PERDEDORES -->
-              <div class="space-y-1.5">
-                <div class="text-[10px] font-black uppercase tracking-wider text-red-400 flex items-center gap-1">
-                  <i data-lucide="trending-down" class="w-3 h-3"></i> Top Perdedores (${loserVotes.toLocaleString('pt-BR')} pts perdidos)
+              <div class="space-y-1">
+                <div class="text-[9px] font-black uppercase tracking-wider text-red-400 flex items-center justify-between whitespace-nowrap">
+                  <span class="flex items-center gap-1"><i data-lucide="trending-down" class="w-3 h-3"></i> Pódio Perdedores</span>
+                  <span class="text-[8px] text-red-300/70 font-normal">${loserVotes.toLocaleString('pt-BR')} pts perdidos</span>
                 </div>
-                <div class="scroll-container rounded-lg bg-black/40 p-1">
-                  <div class="scroll-content ${sortedLosers.length <= 3 ? '[animation:none]' : ''}">
-                    ${losersCardsHTML}
-                  </div>
+                <div class="space-y-1">
+                  ${top3LosersHTML || '<div class="text-[10px] text-gray-400 italic">Sem dados de perdedores</div>'}
                 </div>
+                ${restLosersTickerHTML}
               </div>
 
             </div>
@@ -936,31 +989,40 @@
         `;
       }
 
+      // GRADE DINÂMICA DE ACORDO COM O NÚMERO DE OPÇÕES (2 a 10)
+      const optionsCount = predictionState.options.length;
+      let gridColumnsClass = "grid-cols-1 md:grid-cols-2";
+      if (optionsCount === 3) gridColumnsClass = "grid-cols-1 md:grid-cols-3";
+      else if (optionsCount >= 4 && optionsCount <= 6) gridColumnsClass = "grid-cols-2 md:grid-cols-3";
+      else if (optionsCount > 6) gridColumnsClass = "grid-cols-2 md:grid-cols-4";
+
       // CARDS DAS OPÇÕES
       let optionsCardsHTML = '';
       predictionState.options.forEach((opt, idx) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(0) : 0;
         const formattedVotes = opt.votes.toLocaleString('pt-BR');
+        const participantsCount = opt.usersCount || 0;
         const isWinner = predictionState.winningOptionId === opt.id;
         const isResolved = predictionState.status === 'RESOLVED';
 
         const displayIndex = idx + 1;
+        const isCompact = optionsCount >= 4;
 
         let cardStyle = "glass-card border-white/10";
         let badgeResult = "";
 
         if (isResolved) {
           if (isWinner) {
-            cardStyle = "bg-gradient-to-br from-emerald-950/90 via-emerald-900/50 to-emerald-950/80 border-2 border-emerald-400 shadow-xl shadow-emerald-500/20 scale-[1.02]";
+            cardStyle = "bg-gradient-to-br from-emerald-950/90 via-emerald-900/50 to-emerald-950/80 border-2 border-emerald-400 shadow-xl shadow-emerald-500/20 scale-[1.01]";
             badgeResult = `
-              <span class="bg-emerald-500 text-black font-black text-[10px] px-2 py-0.5 rounded tracking-wider uppercase flex items-center gap-1 shadow-md">
-                <i data-lucide="trophy" class="w-3 h-3"></i> Vencedor
+              <span class="bg-emerald-500 text-black font-black text-[9px] px-1.5 py-0.2 rounded tracking-wider uppercase flex items-center gap-0.5 shadow-md whitespace-nowrap">
+                <i data-lucide="trophy" class="w-2.5 h-2.5"></i> Vencedor
               </span>
             `;
           } else {
             cardStyle = "opacity-40 grayscale-[50%] glass-card border-red-500/30";
             badgeResult = `
-              <span class="bg-red-500/20 text-red-400 border border-red-500/40 font-bold text-[10px] px-2 py-0.5 rounded tracking-wider uppercase">
+              <span class="bg-red-500/20 text-red-400 border border-red-500/40 font-bold text-[9px] px-1.5 py-0.2 rounded tracking-wider uppercase whitespace-nowrap">
                 Perdedor
               </span>
             `;
@@ -968,28 +1030,29 @@
         }
 
         optionsCardsHTML += `
-          <div class="p-4 rounded-xl transition-all duration-300 ${cardStyle} flex flex-col justify-between relative overflow-hidden">
-            <div class="absolute left-0 top-0 bottom-0 w-1.5 ${opt.color.bg}"></div>
+          <div class="${isCompact ? 'p-2.5' : 'p-3.5'} rounded-xl transition-all duration-300 ${cardStyle} flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute left-0 top-0 bottom-0 w-1 ${opt.color.bg}"></div>
 
-            <div class="flex items-start justify-between gap-2 mb-2 pl-2">
-              <span class="font-display font-extrabold text-lg md:text-xl text-white tracking-wide uppercase line-clamp-1">
+            <div class="flex items-start justify-between gap-1 mb-1 pl-1.5">
+              <span class="font-display font-extrabold ${isCompact ? 'text-sm' : 'text-base md:text-lg'} text-white tracking-wide uppercase line-clamp-1">
                 ${escapeHtml(opt.title)}
               </span>
               ${badgeResult}
             </div>
 
-            <div class="flex items-end justify-between pl-2 mt-2">
+            <div class="flex items-end justify-between pl-1.5 mt-1">
               <div>
-                <div class="text-2xl md:text-3xl font-black text-white font-display tracking-tight flex items-baseline gap-1">
-                  ${pct}<span class="text-sm font-bold text-gray-400">%</span>
+                <div class="${isCompact ? 'text-xl' : 'text-2xl md:text-3xl'} font-black text-white font-display tracking-tight flex items-baseline gap-0.5">
+                  ${pct}<span class="text-xs font-bold text-gray-400">%</span>
                 </div>
-                <div class="text-[11px] text-gray-400 font-medium flex items-center gap-1">
-                  <i data-lucide="zap" class="w-3 h-3 ${opt.color.text}"></i>
-                  ${formattedVotes} apostados
+                <div class="text-[10px] text-gray-400 font-medium flex items-center gap-1 flex-wrap">
+                  <span class="flex items-center gap-0.5 text-gray-300 font-semibold"><i data-lucide="users" class="w-2.5 h-2.5 text-twitch-purple"></i> ${participantsCount}</span>
+                  <span class="text-gray-500">•</span>
+                  <span>${formattedVotes} pts</span>
                 </div>
               </div>
 
-              <div class="w-8 h-8 shrink-0 rounded-full ${opt.color.bg}/20 border ${opt.color.border} flex items-center justify-center ${opt.color.text} font-bold text-xs overflow-hidden">
+              <div class="${isCompact ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs'} shrink-0 rounded-full ${opt.color.bg}/20 border ${opt.color.border} flex items-center justify-center ${opt.color.text} font-bold overflow-hidden">
                 ${displayIndex}
               </div>
             </div>
@@ -998,15 +1061,15 @@
       });
 
       const widgetHTML = `
-        <div class="glass-panel p-5 md:p-6 rounded-2xl shadow-2xl border border-white/10 relative overflow-hidden">
+        <div class="glass-panel p-4 md:p-5 rounded-2xl shadow-2xl border border-white/10 relative overflow-hidden">
           <div class="absolute -top-24 -right-24 w-48 h-48 bg-twitch-purple/20 rounded-full blur-3xl pointer-events-none"></div>
 
-          <div class="flex items-center justify-between gap-4 mb-4 pb-3 border-b border-white/10">
-            <div class="flex items-center gap-2.5">
-              <div class="bg-twitch-purple p-1.5 rounded-lg text-white shadow-md shadow-twitch-purple/40">
-                <i data-lucide="help-circle" class="w-5 h-5"></i>
+          <div class="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-white/10">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="bg-twitch-purple p-1 rounded-lg text-white shadow-md shadow-twitch-purple/40 shrink-0">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
               </div>
-              <h3 class="font-display font-extrabold text-lg md:text-xl text-white tracking-wide uppercase line-clamp-1">
+              <h3 class="font-display font-extrabold text-base md:text-lg text-white tracking-wide uppercase truncate">
                 ${escapeHtml(predictionState.title)}
               </h3>
             </div>
@@ -1015,21 +1078,23 @@
 
           ${resultDetailsHTML}
 
-          <div class="mb-5">
-            <div class="h-4 w-full bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex items-center gap-0.5 shadow-inner">
+          <div class="mb-3">
+            <div class="h-3 w-full bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex items-center gap-0.5 shadow-inner">
               ${progressBarSegments}
             </div>
-            <div class="flex justify-between items-center mt-1.5 text-[11px] font-semibold text-gray-400 px-1">
-              <span>Total Apostado: <strong class="text-white">${totalVotes.toLocaleString('pt-BR')}</strong></span>
-              <span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> Twitch Live</span>
+            <div class="flex justify-between items-center mt-1 text-[10px] font-semibold text-gray-400 px-0.5 flex-wrap gap-1">
+              <span>Total Apostado: <strong class="text-white">${totalVotes.toLocaleString('pt-BR')} pts</strong></span>
+              <span class="flex items-center gap-1 text-twitch-accent font-bold">
+                <i data-lucide="users" class="w-2.5 h-2.5"></i> ${totalParticipants} Participantes na Live
+              </span>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-${Math.min(predictionState.options.length, 3)} gap-3">
+          <div class="grid ${gridColumnsClass} gap-2">
             ${optionsCardsHTML}
           </div>
 
-          <div class="mt-4 pt-2 flex items-center justify-between text-[10px] text-gray-500 font-medium">
+          <div class="mt-3 pt-1.5 flex items-center justify-between text-[9px] text-gray-500 font-medium border-t border-white/5">
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-twitch-purple"></span> Twitch Predictions Overlay
             </span>
