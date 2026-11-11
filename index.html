@@ -237,7 +237,6 @@
 
   <script>
     // --- CONFIGURAÇÃO DA VERCEL API ---
-    // IMPORTANTE: Altere para a URL completa da sua aplicação publicada na Vercel
     const VERCEL_API_URL = window.location.origin.includes('localhost') 
       ? '/api/subscribe' 
       : 'https://twitch-prediction-overlay-steel.vercel.app/api/subscribe';
@@ -260,8 +259,8 @@
       remainingTime: 120,
       winningOptionId: null,
       options: [
-        { id: '1', title: 'Sim', votes: 0, color: OPTION_COLORS[0] },
-        { id: '2', title: 'Não', votes: 0, color: OPTION_COLORS[1] }
+        { id: '1', twitchId: '', title: 'Sim', votes: 0, color: OPTION_COLORS[0] },
+        { id: '2', twitchId: '', title: 'Não', votes: 0, color: OPTION_COLORS[1] }
       ]
     };
 
@@ -322,7 +321,7 @@
         }
 
         if (messageType === 'session_keepalive') {
-          return; // Manutenção de conexão
+          return;
         }
 
         if (messageType === 'notification') {
@@ -368,8 +367,10 @@
       const totalPoints = event.outcomes ? event.outcomes.reduce((acc, o) => acc + (o.channel_points || 0), 0) : 0;
 
       if (type === 'channel.prediction.begin' || type === 'channel.prediction.progress') {
+        // Garantimos id numérico (1, 2...) para UI e preservamos o UUID da Twitch em twitchId
         const mappedOptions = event.outcomes.map((o, idx) => ({
-          id: o.id || String(idx + 1),
+          id: String(idx + 1),
+          twitchId: o.id || '',
           title: o.title,
           votes: o.channel_points || 0,
           color: OPTION_COLORS[idx % OPTION_COLORS.length]
@@ -400,9 +401,13 @@
         const winningId = event.winning_outcome_id;
         const status = event.status === 'RESOLVED' ? 'RESOLVED' : 'CANCELLED';
 
+        // Encontra o id local (1, 2...) correspondente ao winning_outcome_id (UUID) da Twitch
+        const winnerOpt = predictionState.options.find(o => o.twitchId === winningId || o.id === winningId);
+        const resolvedWinnerId = winnerOpt ? winnerOpt.id : winningId;
+
         updateState({
           status: status,
-          winningOptionId: winningId
+          winningOptionId: resolvedWinnerId
         });
 
         if (status === 'RESOLVED') {
@@ -512,6 +517,7 @@
       
       const options = Array.from(optionElements).map((input, idx) => ({
         id: String(idx + 1),
+        twitchId: '',
         title: input.value || `Opção ${idx + 1}`,
         votes: 0,
         color: OPTION_COLORS[idx % OPTION_COLORS.length]
@@ -677,18 +683,15 @@
       }
 
       let optionsCardsHTML = '';
-      predictionState.options.forEach((opt, idx) => {
+      predictionState.options.forEach((opt) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(0) : 0;
         const formattedVotes = opt.votes.toLocaleString('pt-BR');
         const isWinner = predictionState.winningOptionId === opt.id;
         const isResolved = predictionState.status === 'RESOLVED';
-      
-        // Usamos (idx + 1) para exibir "1", "2", "3" na bolinha em vez do UUID longo da Twitch
-        const displayIndex = idx + 1;
-      
+
         let cardStyle = "glass-card border-white/10";
         let badgeResult = "";
-      
+
         if (isResolved) {
           if (isWinner) {
             cardStyle = "bg-gradient-to-br from-emerald-950/80 to-emerald-900/40 border-2 border-emerald-400 shadow-lg shadow-emerald-500/20 scale-[1.02]";
@@ -706,18 +709,18 @@
             `;
           }
         }
-      
+
         optionsCardsHTML += `
           <div class="p-4 rounded-xl transition-all duration-300 ${cardStyle} flex flex-col justify-between relative overflow-hidden">
             <div class="absolute left-0 top-0 bottom-0 w-1.5 ${opt.color.bg}"></div>
-      
+
             <div class="flex items-start justify-between gap-2 mb-2 pl-2">
               <span class="font-display font-extrabold text-lg md:text-xl text-white tracking-wide uppercase line-clamp-1">
                 ${escapeHtml(opt.title)}
               </span>
               ${badgeResult}
             </div>
-      
+
             <div class="flex items-end justify-between pl-2 mt-2">
               <div>
                 <div class="text-2xl md:text-3xl font-black text-white font-display tracking-tight flex items-baseline gap-1">
@@ -728,10 +731,10 @@
                   ${formattedVotes} pontos
                 </div>
               </div>
-      
-              <!-- Exibe apenas o número de ordem (1, 2...) com classe de estouro contida -->
+
+              <!-- Sempre exibe o número de ordem limpo: 1, 2, 3... -->
               <div class="w-8 h-8 shrink-0 rounded-full ${opt.color.bg}/20 border ${opt.color.border} flex items-center justify-center ${opt.color.text} font-bold text-xs overflow-hidden">
-                ${displayIndex}
+                ${opt.id}
               </div>
             </div>
           </div>
