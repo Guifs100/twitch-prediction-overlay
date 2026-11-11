@@ -66,17 +66,17 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /* ANIMAÇÃO DE ENTRADA E SAÍDA DO WIDGET */
+    /* TRANSITION SMOOTH DA VISIBILIDADE */
     .widget-animated {
-      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .widget-hidden {
-      opacity: 0;
-      transform: translateY(-20px) scale(0.95);
+      opacity: 0 !important;
+      transform: translateY(-15px) scale(0.95);
       pointer-events: none;
     }
     .widget-visible {
-      opacity: 1;
+      opacity: 1 !important;
       transform: translateY(0) scale(1);
     }
 
@@ -222,11 +222,11 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS)
             </span>
-            <span class="text-xs text-gray-500">Auto-Hide Inteligente</span>
+            <span class="text-xs text-gray-500">Auto-Hide Ativo (Esconde após 10s do fim)</span>
           </div>
 
           <div class="flex-1 min-h-[480px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden bg-[radial-gradient(#1e1e24_1px,transparent_1px)] [background-size:16px_16px]">
-            <div id="overlay-widget-container" class="w-full max-w-2xl widget-animated widget-hidden"></div>
+            <div id="overlay-widget-container" class="w-full max-w-2xl widget-animated widget-visible"></div>
           </div>
         </div>
       </section>
@@ -235,7 +235,7 @@
 
     <!-- MODO APENAS OVERLAY (OBS BROWSER SOURCE) -->
     <div id="overlay-only-view" class="hidden min-h-screen flex items-center justify-center p-4">
-      <div id="overlay-standalone-container" class="w-full max-w-3xl widget-animated widget-hidden"></div>
+      <div id="overlay-standalone-container" class="w-full max-w-3xl widget-animated widget-visible"></div>
     </div>
 
   </main>
@@ -260,16 +260,17 @@
       { name: 'Laranja', hex: '#FF9F1C', bg: 'bg-[#FF9F1C]', text: 'text-[#FF9F1C]', border: 'border-[#FF9F1C]' }
     ];
 
+    // DEFINIDO COMO VISÍVEL POR PADRÃO QUANDO HOUVER DADOS E VISÍVEL AO INICIAR
     let predictionState = {
-      title: "Nenhum palpite ativo no momento",
-      status: "IDLE", // IDLE, ACTIVE, LOCKED, RESOLVED, CANCELLED
+      title: "O streamer vai passar de fase?",
+      status: "ACTIVE", 
       totalDuration: 120,
       remainingTime: 120,
       winningOptionId: null,
-      isVisible: false,
+      isVisible: true,
       options: [
-        { id: '1', twitchId: '', title: 'Sim', votes: 0, color: OPTION_COLORS[0] },
-        { id: '2', twitchId: '', title: 'Não', votes: 0, color: OPTION_COLORS[1] }
+        { id: '1', twitchId: '', title: 'Sim', votes: 14500, color: OPTION_COLORS[0] },
+        { id: '2', twitchId: '', title: 'Não', votes: 8200, color: OPTION_COLORS[1] }
       ]
     };
 
@@ -286,7 +287,10 @@
 
       const savedState = localStorage.getItem('twitch_prediction_data');
       if (savedState) {
-        try { predictionState = JSON.parse(savedState); } catch(e){}
+        try { 
+          const parsed = JSON.parse(savedState);
+          predictionState = { ...predictionState, ...parsed, isVisible: true };
+        } catch(e){}
       }
 
       renderOptionInputs([predictionState.options[0]?.title || 'Sim', predictionState.options[1]?.title || 'Não']);
@@ -420,12 +424,12 @@
           showToast("Palpite Encerrado na Twitch!");
         }
 
-        // Esconder o overlay suavemente após 8 segundos
-        scheduleAutoHide(8000);
+        // Esconder o overlay suavemente 10 segundos após o resultado final
+        scheduleAutoHide(10000);
       }
     }
 
-    function scheduleAutoHide(delayMs = 8000) {
+    function scheduleAutoHide(delayMs = 10000) {
       clearTimeout(autoHideTimeout);
       autoHideTimeout = setTimeout(() => {
         updateState({ isVisible: false });
@@ -553,7 +557,7 @@
     function lockPrediction() {
       if (predictionState.status === 'ACTIVE') {
         clearInterval(timerInterval);
-        updateState({ status: 'LOCKED', remainingTime: 0 });
+        updateState({ status: 'LOCKED', remainingTime: 0, isVisible: true });
         showToast("Votações trancadas!");
       }
     }
@@ -583,7 +587,7 @@
       updateState({ status: 'RESOLVED', winningOptionId: winnerId, isVisible: true });
       try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch(err){}
       showToast("Predição Encerrada!");
-      scheduleAutoHide(8000);
+      scheduleAutoHide(10000);
     }
 
     function renderApp() {
@@ -648,18 +652,18 @@
       }
     }
 
-    // --- OVERLAY WIDGET COM ANIMAÇÃO E PAINEL DE DISTRIBUIÇÃO ---
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
 
-      // Controle de visibilidade com transição suave
-      if (predictionState.isVisible) {
-        if (containerDual) containerDual.className = 'w-full max-w-2xl widget-animated widget-visible';
-        if (containerStandalone) containerStandalone.className = 'w-full max-w-3xl widget-animated widget-visible';
-      } else {
-        if (containerDual) containerDual.className = 'w-full max-w-2xl widget-animated widget-hidden';
-        if (containerStandalone) containerStandalone.className = 'w-full max-w-3xl widget-animated widget-hidden';
+      // CONTROLE DIRETO DA CLASSE DE VISIBILIDADE
+      const visibilityClass = predictionState.isVisible ? 'widget-visible' : 'widget-hidden';
+
+      if (containerDual) {
+        containerDual.className = `w-full max-w-2xl widget-animated ${visibilityClass}`;
+      }
+      if (containerStandalone) {
+        containerStandalone.className = `w-full max-w-3xl widget-animated ${visibilityClass}`;
       }
 
       const totalVotes = predictionState.options.reduce((acc, curr) => acc + curr.votes, 0);
@@ -668,19 +672,15 @@
       const secs = predictionState.remainingTime % 60;
       const formattedTime = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
-      // Cálculo da distribuição de pontos (Perdedores -> Ganhadores)
       const winnerOption = predictionState.options.find(o => o.id === predictionState.winningOptionId);
       const loserVotes = predictionState.options
         .filter(o => o.id !== predictionState.winningOptionId)
         .reduce((sum, o) => sum + o.votes, 0);
       
       const winnerVotes = winnerOption ? winnerOption.votes : 0;
-
-      // Odds: Quantos pontos cada 1k ganha
       const returnRatio = (winnerVotes > 0) ? ((totalVotes / winnerVotes)).toFixed(2) : "1.00";
       const returnPer1k = Math.round(1000 * parseFloat(returnRatio));
 
-      // Barras de progresso fracionadas
       let progressBarSegments = '';
       predictionState.options.forEach((opt) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(1) : (100 / predictionState.options.length).toFixed(1);
@@ -720,7 +720,6 @@
         `;
       }
 
-      // Painel de Distribuição de Pontos (Estilo Twitch/Reddit Overlay)
       let distributionPanelHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         distributionPanelHTML = `
@@ -748,7 +747,6 @@
         `;
       }
 
-      // Render dos Cards das Opções
       let optionsCardsHTML = '';
       predictionState.options.forEach((opt) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(0) : 0;
