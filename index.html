@@ -35,16 +35,11 @@
           },
           animation: {
             'glow-winner': 'glowWinner 1.5s ease-in-out infinite alternate',
-            'marquee-left': 'marqueeLeft 8s linear infinite',
           },
           keyframes: {
             glowWinner: {
               '0%': { boxShadow: '0 0 15px rgba(16, 185, 129, 0.3)' },
               '100%': { boxShadow: '0 0 35px rgba(16, 185, 129, 0.8), 0 0 15px rgba(0, 245, 212, 0.5)' }
-            },
-            marqueeLeft: {
-              '0%': { transform: 'translateX(0%)' },
-              '100%': { transform: 'translateX(-50%)' }
             }
           }
         }
@@ -93,25 +88,20 @@
       overflow: hidden !important;
     }
 
-    .marquee-wrapper {
-      display: flex;
-      overflow: hidden;
-      width: 100%;
-      position: relative;
+    /* Container de listagem compacta sem marquee para exibir todos perfeitamente */
+    .participants-scroll-box {
+      max-height: 52px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.2) transparent;
     }
-    .marquee-track {
-      display: flex;
-      flex-shrink: 0;
-      gap: 0.35rem;
-      align-items: center;
-      animation: marqueeLeft 8s linear infinite;
-      will-change: transform;
+    .participants-scroll-box::-webkit-scrollbar {
+      width: 3px;
     }
-    .marquee-wrapper:hover .marquee-track {
-      animation-play-state: paused;
+    .participants-scroll-box::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
     }
-
-    ::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body class="bg-[#09090b] text-gray-100 font-sans min-h-screen selection:bg-twitch-purple selection:text-white">
@@ -124,9 +114,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v5.4 Auto-Hide 10s</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.7 Stable</span>
         </h1>
-        <p class="text-xs text-gray-400">Marquee completo de 8s + Auto-Hide de 10s para resetar a tela</p>
+        <p class="text-xs text-gray-400">Layout simétrico, listagem completa de todos os apostadores e auto-reset em 10s</p>
       </div>
     </div>
 
@@ -163,7 +153,7 @@
           <form id="prediction-form" onsubmit="handleStartPrediction(event)" class="space-y-4">
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pergunta do Palpite</label>
-              <input type="text" id="input-title" required placeholder="Ex: Quem ganha a partida?" class="w-full bg-[#0e0e10] border border-twitch-border focus:border-twitch-purple rounded-xl p-3 text-sm text-white focus:outline-none">
+              <input type="text" id="input-title" required placeholder="Ex: Vamos escapar?" class="w-full bg-[#0e0e10] border border-twitch-border focus:border-twitch-purple rounded-xl p-3 text-sm text-white focus:outline-none">
             </div>
 
             <div>
@@ -227,7 +217,7 @@
               <i data-lucide="layers" class="w-4 h-4"></i> Testar 10 Opções Ativas
             </button>
             <button onclick="simulateHeavyResult()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all">
-              <i data-lucide="sparkles" class="w-4 h-4"></i> Simular Dual Marquee (Top 10+)
+              <i data-lucide="sparkles" class="w-4 h-4"></i> Simular Resultado Completo (Top 10+)
             </button>
             <div id="resolve-controls" class="grid grid-cols-1 gap-2 pt-1"></div>
           </div>
@@ -502,7 +492,6 @@
           showToast("Palpite Encerrado!");
         }
 
-        // AUTO HIDE EXATO EM 10 SEGUNDOS APÓS MOSTRAR O MARQUEE COMPLETO
         scheduleAutoHide(10000);
       }
     }
@@ -682,7 +671,7 @@
       }));
 
       updateState({
-        title: "Quem será o campeão do torneio de hoje?",
+        title: "Vamos escapar?",
         status: 'ACTIVE',
         totalDuration: 120,
         remainingTime: 120,
@@ -729,7 +718,7 @@
 
     function simulateHeavyResult() {
       if (!predictionState.options || predictionState.options.length === 0) {
-        presetOptions(4);
+        presetOptions(2);
         handleStartPrediction({ preventDefault: () => {} });
       }
 
@@ -842,7 +831,7 @@
       }
     }
 
-    // RENDERIZADOR DO OVERLAY
+    // RENDERIZADOR DO OVERLAY COM COLUNAS RIGOROSAMENTE SIMÉTRICAS
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -915,7 +904,7 @@
         `;
       }
 
-      // PAINEL DE RESULTADOS COM TOP 3 E DUAL MARQUEE (8s LOOP)
+      // PAINEL DE RESULTADOS COM COLUNAS 100% SIMÉTRICAS E SCROLLBOX COMPACTA PARA TODOS OS APOSTADORES
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
@@ -952,11 +941,10 @@
           `;
         }).join('');
 
-        let restWinnersMarqueeHTML = '';
+        let restWinnersListHTML = '';
         if (restWinners.length > 0) {
-          const listToScroll = [...restWinners, ...restWinners];
-          const items = listToScroll.map((p, i) => {
-            const rank = (i % restWinners.length) + 4;
+          const items = restWinners.map((p, i) => {
+            const rank = i + 4;
             const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
             return `
               <div class="inline-flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/40 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap shrink-0">
@@ -967,11 +955,9 @@
             `;
           }).join('');
 
-          restWinnersMarqueeHTML = `
-            <div class="mt-1 marquee-wrapper bg-black/60 p-0.5 rounded border border-emerald-500/20">
-              <div class="marquee-track">
-                ${items}
-              </div>
+          restWinnersListHTML = `
+            <div class="mt-1 participants-scroll-box bg-black/60 p-1 rounded border border-emerald-500/20 flex flex-wrap gap-1 items-center">
+              ${items}
             </div>
           `;
         }
@@ -1002,11 +988,10 @@
           `;
         }).join('');
 
-        let restLosersMarqueeHTML = '';
+        let restLosersListHTML = '';
         if (restLosers.length > 0) {
-          const listToScroll = [...restLosers, ...restLosers];
-          const items = listToScroll.map((p, i) => {
-            const rank = (i % restLosers.length) + 4;
+          const items = restLosers.map((p, i) => {
+            const rank = i + 4;
             const lostPts = p.points || p.lost || 0;
             return `
               <div class="inline-flex items-center gap-1 bg-red-950/70 border border-red-500/30 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap shrink-0">
@@ -1017,11 +1002,9 @@
             `;
           }).join('');
 
-          restLosersMarqueeHTML = `
-            <div class="mt-1 marquee-wrapper bg-black/60 p-0.5 rounded border border-red-500/20">
-              <div class="marquee-track">
-                ${items}
-              </div>
+          restLosersListHTML = `
+            <div class="mt-1 participants-scroll-box bg-black/60 p-1 rounded border border-red-500/20 flex flex-wrap gap-1 items-center">
+              ${items}
             </div>
           `;
         }
@@ -1046,31 +1029,39 @@
               </div>
             </div>
 
-            <!-- DUAL COLUMN TOP & MARQUEE -->
+            <!-- COLUNAS 100% SIMÉTRICAS E PROPORCIONAIS -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
               
-              <!-- COLUNA ESQUERDA: GANHADORES -->
-              <div class="space-y-0.5 min-w-0">
-                <div class="text-[8px] font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between whitespace-nowrap">
-                  <span class="flex items-center gap-1"><i data-lucide="trophy" class="w-2.5 h-2.5"></i> Top Ganhadores</span>
-                  <span class="text-[7.5px] text-emerald-300/70 font-normal">+${loserVotes.toLocaleString('pt-BR')} pts</span>
+              <!-- COLUNA ESQUERDA: TOP GANHADORES -->
+              <div class="flex flex-col justify-between space-y-0.5 min-w-0 h-full">
+                <div>
+                  <div class="text-[8px] font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between whitespace-nowrap mb-0.5">
+                    <span class="flex items-center gap-1"><i data-lucide="trophy" class="w-2.5 h-2.5"></i> Top Ganhadores</span>
+                    <span class="text-[7.5px] text-emerald-300/70 font-normal">+${loserVotes.toLocaleString('pt-BR')} pts</span>
+                  </div>
+                  <div class="space-y-0.5">
+                    ${top3WinnersHTML || '<div class="text-[8px] text-gray-400 italic">Sem ganhadores</div>'}
+                  </div>
                 </div>
-                <div class="space-y-0.5">
-                  ${top3WinnersHTML || '<div class="text-[8px] text-gray-400 italic">Sem ganhadores</div>'}
+                <div>
+                  ${restWinnersListHTML}
                 </div>
-                ${restWinnersMarqueeHTML}
               </div>
 
-              <!-- COLUNA DIREITA: PERDEDORES -->
-              <div class="space-y-0.5 min-w-0">
-                <div class="text-[8px] font-black uppercase tracking-wider text-red-400 flex items-center justify-between whitespace-nowrap">
-                  <span class="flex items-center gap-1"><i data-lucide="trending-down" class="w-2.5 h-2.5"></i> Top Perdedores</span>
-                  <span class="text-[7.5px] text-red-300/70 font-normal">${loserVotes.toLocaleString('pt-BR')} pts</span>
+              <!-- COLUNA DIREITA: TOP PERDEDORES -->
+              <div class="flex flex-col justify-between space-y-0.5 min-w-0 h-full">
+                <div>
+                  <div class="text-[8px] font-black uppercase tracking-wider text-red-400 flex items-center justify-between whitespace-nowrap mb-0.5">
+                    <span class="flex items-center gap-1"><i data-lucide="trending-down" class="w-2.5 h-2.5"></i> Top Perdedores</span>
+                    <span class="text-[7.5px] text-red-300/70 font-normal">${loserVotes.toLocaleString('pt-BR')} pts</span>
+                  </div>
+                  <div class="space-y-0.5">
+                    ${top3LosersHTML || '<div class="text-[8px] text-gray-400 italic">Sem perdedores</div>'}
+                  </div>
                 </div>
-                <div class="space-y-0.5">
-                  ${top3LosersHTML || '<div class="text-[8px] text-gray-400 italic">Sem perdedores</div>'}
+                <div>
+                  ${restLosersListHTML}
                 </div>
-                ${restLosersMarqueeHTML}
               </div>
 
             </div>
