@@ -88,19 +88,23 @@
       overflow: hidden !important;
     }
 
-    /* Container de listagem compacta sem marquee para exibir todos perfeitamente */
-    .participants-scroll-box {
-      max-height: 52px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255,255,255,0.2) transparent;
+    /* Container de Rolagem Automática JS (Garante compatibilidade total no OBS) */
+    .auto-scroll-container {
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      width: 100%;
+      display: flex;
+      align-items: center;
     }
-    .participants-scroll-box::-webkit-scrollbar {
-      width: 3px;
+    .auto-scroll-track {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      will-change: transform;
     }
-    .participants-scroll-box::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.2);
-      border-radius: 2px;
+    .auto-scroll-container:hover .auto-scroll-track {
+      animation-play-state: paused;
     }
   </style>
 </head>
@@ -114,9 +118,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.7 Stable</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 JS Marquee</span>
         </h1>
-        <p class="text-xs text-gray-400">Layout simétrico, listagem completa de todos os apostadores e auto-reset em 10s</p>
+        <p class="text-xs text-gray-400">Rolagem automática contínua via JS com simetria e auto-hide em 10s</p>
       </div>
     </div>
 
@@ -772,6 +776,7 @@
     function renderApp() {
       renderControls();
       renderOverlayWidget();
+      initAutoScroll();
     }
 
     function renderControls() {
@@ -831,7 +836,7 @@
       }
     }
 
-    // RENDERIZADOR DO OVERLAY COM COLUNAS RIGOROSAMENTE SIMÉTRICAS
+    // RENDERIZADOR DO OVERLAY COM ROLAGEM AUTOMÁTICA EM LOOP (JS MARQUEE)
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -904,7 +909,7 @@
         `;
       }
 
-      // PAINEL DE RESULTADOS COM COLUNAS 100% SIMÉTRICAS E SCROLLBOX COMPACTA PARA TODOS OS APOSTADORES
+      // PAINEL DE RESULTADOS COM COLUNAS SIMÉTRICAS E ROLAGEM JS AUTOMÁTICA CONTÍNUA
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
@@ -941,13 +946,13 @@
           `;
         }).join('');
 
-        let restWinnersListHTML = '';
+        let restWinnersMarqueeHTML = '';
         if (restWinners.length > 0) {
-          const items = restWinners.map((p, i) => {
+          const listItems = restWinners.map((p, i) => {
             const rank = i + 4;
             const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
             return `
-              <div class="inline-flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/40 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap shrink-0">
+              <div class="inline-flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/40 px-2 py-0.5 rounded text-[9px] whitespace-nowrap shrink-0">
                 <strong class="text-emerald-400 text-[8px]">${rank}º</strong>
                 <span class="text-white font-semibold">${escapeHtml(p.name)}</span>
                 <span class="text-emerald-400 font-extrabold">+${totalGanhos.toLocaleString('pt-BR')}</span>
@@ -955,9 +960,11 @@
             `;
           }).join('');
 
-          restWinnersListHTML = `
-            <div class="mt-1 participants-scroll-box bg-black/60 p-1 rounded border border-emerald-500/20 flex flex-wrap gap-1 items-center">
-              ${items}
+          restWinnersMarqueeHTML = `
+            <div class="mt-1 auto-scroll-container bg-black/60 p-1 rounded border border-emerald-500/20" data-autoscroll>
+              <div class="auto-scroll-track">
+                ${listItems} ${listItems}
+              </div>
             </div>
           `;
         }
@@ -988,13 +995,13 @@
           `;
         }).join('');
 
-        let restLosersListHTML = '';
+        let restLosersMarqueeHTML = '';
         if (restLosers.length > 0) {
-          const items = restLosers.map((p, i) => {
+          const listItems = restLosers.map((p, i) => {
             const rank = i + 4;
             const lostPts = p.points || p.lost || 0;
             return `
-              <div class="inline-flex items-center gap-1 bg-red-950/70 border border-red-500/30 px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap shrink-0">
+              <div class="inline-flex items-center gap-1 bg-red-950/70 border border-red-500/30 px-2 py-0.5 rounded text-[9px] whitespace-nowrap shrink-0">
                 <strong class="text-red-400 text-[8px]">${rank}º</strong>
                 <span class="text-gray-300 font-medium">${escapeHtml(p.name)}</span>
                 <span class="text-red-400 font-extrabold">-${lostPts.toLocaleString('pt-BR')}</span>
@@ -1002,9 +1009,11 @@
             `;
           }).join('');
 
-          restLosersListHTML = `
-            <div class="mt-1 participants-scroll-box bg-black/60 p-1 rounded border border-red-500/20 flex flex-wrap gap-1 items-center">
-              ${items}
+          restLosersMarqueeHTML = `
+            <div class="mt-1 auto-scroll-container bg-black/60 p-1 rounded border border-red-500/20" data-autoscroll>
+              <div class="auto-scroll-track">
+                ${listItems} ${listItems}
+              </div>
             </div>
           `;
         }
@@ -1044,7 +1053,7 @@
                   </div>
                 </div>
                 <div>
-                  ${restWinnersListHTML}
+                  ${restWinnersMarqueeHTML}
                 </div>
               </div>
 
@@ -1060,7 +1069,7 @@
                   </div>
                 </div>
                 <div>
-                  ${restLosersListHTML}
+                  ${restLosersMarqueeHTML}
                 </div>
               </div>
 
@@ -1189,6 +1198,39 @@
       if (containerStandalone) containerStandalone.innerHTML = widgetHTML;
 
       lucide.createIcons();
+    }
+
+    // MOTOR DE ROLAGEM AUTOMÁTICA CONTÍNUA (JS LOOP)
+    function initAutoScroll() {
+      setTimeout(() => {
+        const containers = document.querySelectorAll('[data-autoscroll]');
+        containers.forEach(container => {
+          const track = container.querySelector('.auto-scroll-track');
+          if (!track) return;
+
+          let scrollPos = 0;
+          const speed = 0.5; // Velocidade do movimento horizontal
+          let animationId = null;
+
+          function step() {
+            scrollPos += speed;
+            // Quando atingir a metade exata (já que duplicamos os itens no HTML), reinicia sem salto visual
+            if (scrollPos >= (track.scrollWidth / 2)) {
+              scrollPos = 0;
+            }
+            track.style.transform = `translateX(-${scrollPos}px)`;
+            animationId = requestAnimationFrame(step);
+          }
+
+          // Cancela animação anterior se houver
+          if (container._animId) cancelAnimationFrame(container._animId);
+          animationId = requestAnimationFrame(step);
+          container._animId = animationId;
+
+          container.onmouseenter = () => cancelAnimationFrame(animationId);
+          container.onmouseleave = () => { animationId = requestAnimationFrame(step); };
+        });
+      }, 150);
     }
 
     function toggleViewMode() {
