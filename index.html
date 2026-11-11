@@ -88,7 +88,6 @@
       overflow: hidden !important;
     }
 
-    /* Container de Rolagem Automática JS (Garante compatibilidade total no OBS) */
     .auto-scroll-container {
       overflow: hidden;
       white-space: nowrap;
@@ -103,9 +102,6 @@
       align-items: center;
       will-change: transform;
     }
-    .auto-scroll-container:hover .auto-scroll-track {
-      animation-play-state: paused;
-    }
   </style>
 </head>
 <body class="bg-[#09090b] text-gray-100 font-sans min-h-screen selection:bg-twitch-purple selection:text-white">
@@ -118,9 +114,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 JS Marquee</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 Ping-Pong 12s</span>
         </h1>
-        <p class="text-xs text-gray-400">Rolagem automática contínua via JS com simetria e auto-hide em 10s</p>
+        <p class="text-xs text-gray-400">Rolagem vai e volta suave (12s) e Auto-Hide em 15 segundos</p>
       </div>
     </div>
 
@@ -236,7 +232,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS)
             </span>
-            <span class="text-xs text-amber-400 font-semibold">Auto-Hide & Reset em 10s ao encerrar</span>
+            <span class="text-xs text-amber-400 font-semibold">Auto-Hide & Reset em 15s ao encerrar</span>
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
@@ -322,7 +318,7 @@
       predictionState.isVisible = (newStatus !== 'IDLE');
     }
 
-    function scheduleAutoHide(delayMs = 10000) {
+    function scheduleAutoHide(delayMs = 15000) {
       clearTimeout(autoHideTimeout);
       autoHideTimeout = setTimeout(() => {
         updateState({ isVisible: false, status: 'IDLE', winningOptionId: null });
@@ -496,7 +492,7 @@
           showToast("Palpite Encerrado!");
         }
 
-        scheduleAutoHide(10000);
+        scheduleAutoHide(15000);
       }
     }
 
@@ -537,7 +533,7 @@
             clearInterval(timerInterval);
             showToast("Votações encerradas!");
             updateState(predictionState);
-            scheduleAutoHide(10000);
+            scheduleAutoHide(15000);
           }
         }, 1000);
       }
@@ -636,7 +632,7 @@
         clearInterval(timerInterval);
         updateState({ status: 'LOCKED', remainingTime: 0, isVisible: true });
         showToast("Votações trancadas!");
-        scheduleAutoHide(10000);
+        scheduleAutoHide(15000);
       }
     }
 
@@ -717,7 +713,7 @@
       updateState({ status: 'RESOLVED', winningOptionId: winnerId, options: updatedOptions, isVisible: true });
       try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch(err){}
       showToast("Palpite Encerrado!");
-      scheduleAutoHide(10000);
+      scheduleAutoHide(15000);
     }
 
     function simulateHeavyResult() {
@@ -769,14 +765,14 @@
       });
 
       try { confetti({ particleCount: 140, spread: 90, origin: { y: 0.6 } }); } catch(err){}
-      showToast("Simulação Aplicada (Auto-Hide em 10s)!");
-      scheduleAutoHide(10000);
+      showToast("Simulação Aplicada (Auto-Hide em 15s)!");
+      scheduleAutoHide(15000);
     }
 
     function renderApp() {
       renderControls();
       renderOverlayWidget();
-      initAutoScroll();
+      initPingPongScroll();
     }
 
     function renderControls() {
@@ -836,7 +832,7 @@
       }
     }
 
-    // RENDERIZADOR DO OVERLAY COM ROLAGEM AUTOMÁTICA EM LOOP (JS MARQUEE)
+    // RENDERIZADOR DO OVERLAY COM ROLAGEM PING-PONG (VAI E VOLTA EM 12 SEGUNDOS)
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -909,11 +905,10 @@
         `;
       }
 
-      // PAINEL DE RESULTADOS COM COLUNAS SIMÉTRICAS E ROLAGEM JS AUTOMÁTICA CONTÍNUA
+      // PAINEL DE RESULTADOS COM COLUNAS SIMÉTRICAS E PING-PONG SCROLL
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
-        // GANHADORES (TOP 3 E DEMAIS)
         const winnersArray = winnerOption.topPredictors || [];
         const sortedWinners = [...winnersArray].sort((a, b) => (b.won || b.points) - (a.won || a.points));
         const top3Winners = sortedWinners.slice(0, 3);
@@ -946,7 +941,7 @@
           `;
         }).join('');
 
-        let restWinnersMarqueeHTML = '';
+        let restWinnersScrollHTML = '';
         if (restWinners.length > 0) {
           const listItems = restWinners.map((p, i) => {
             const rank = i + 4;
@@ -960,16 +955,15 @@
             `;
           }).join('');
 
-          restWinnersMarqueeHTML = `
-            <div class="mt-1 auto-scroll-container bg-black/60 p-1 rounded border border-emerald-500/20" data-autoscroll>
+          restWinnersScrollHTML = `
+            <div class="mt-1 auto-scroll-container bg-black/60 p-1 rounded border border-emerald-500/20" data-pingpong>
               <div class="auto-scroll-track">
-                ${listItems} ${listItems}
+                ${listItems}
               </div>
             </div>
           `;
         }
 
-        // PERDEDORES (TOP 3 E DEMAIS)
         const loserPredictors = loserOptions.flatMap(o => o.topPredictors || []);
         const sortedLosers = [...loserPredictors].sort((a, b) => (b.points || b.lost) - (a.points || a.lost));
         const top3Losers = sortedLosers.slice(0, 3);
@@ -995,7 +989,7 @@
           `;
         }).join('');
 
-        let restLosersMarqueeHTML = '';
+        let restLosersScrollHTML = '';
         if (restLosers.length > 0) {
           const listItems = restLosers.map((p, i) => {
             const rank = i + 4;
@@ -1009,10 +1003,10 @@
             `;
           }).join('');
 
-          restLosersMarqueeHTML = `
-            <div class="mt-1 auto-scroll-container bg-black/60 p-1 rounded border border-red-500/20" data-autoscroll>
+          restLosersScrollHTML = `
+            <div class="mt-1 auto-scroll-container bg-black/60 p-1 rounded border border-red-500/20" data-pingpong>
               <div class="auto-scroll-track">
-                ${listItems} ${listItems}
+                ${listItems}
               </div>
             </div>
           `;
@@ -1053,7 +1047,7 @@
                   </div>
                 </div>
                 <div>
-                  ${restWinnersMarqueeHTML}
+                  ${restWinnersScrollHTML}
                 </div>
               </div>
 
@@ -1069,7 +1063,7 @@
                   </div>
                 </div>
                 <div>
-                  ${restLosersMarqueeHTML}
+                  ${restLosersScrollHTML}
                 </div>
               </div>
 
@@ -1079,14 +1073,12 @@
         `;
       }
 
-      // GRADE ADAPTATIVA
       const optionsCount = predictionState.options.length;
       let gridColumnsClass = "grid-cols-1 md:grid-cols-2";
       if (optionsCount === 3) gridColumnsClass = "grid-cols-1 md:grid-cols-3";
       else if (optionsCount >= 4 && optionsCount <= 6) gridColumnsClass = "grid-cols-2 md:grid-cols-3";
       else if (optionsCount > 6) gridColumnsClass = "grid-cols-2 md:grid-cols-5";
 
-      // CARDS DAS OPÇÕES
       let optionsCardsHTML = '';
       predictionState.options.forEach((opt, idx) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(0) : 0;
@@ -1200,35 +1192,46 @@
       lucide.createIcons();
     }
 
-    // MOTOR DE ROLAGEM AUTOMÁTICA CONTÍNUA (JS LOOP)
-    function initAutoScroll() {
+    // MOTOR DE ROLAGEM PING-PONG (VAI E VOLTA EM 12 SEGUNDOS)
+    function initPingPongScroll() {
       setTimeout(() => {
-        const containers = document.querySelectorAll('[data-autoscroll]');
+        const containers = document.querySelectorAll('[data-pingpong]');
         containers.forEach(container => {
           const track = container.querySelector('.auto-scroll-track');
           if (!track) return;
 
-          let scrollPos = 0;
-          const speed = 0.5; // Velocidade do movimento horizontal
-          let animationId = null;
+          const maxScroll = track.scrollWidth - container.clientWidth;
+          if (maxScroll <= 0) return; // Se couber tudo, não precisa rolar
+
+          let pos = 0;
+          let direction = 1; // 1 = vai para a direita, -1 = volta para a esquerda
+          
+          // Tempo alvo de ciclo completo (ida e volta) = 12 segundos (~720 frames a 60fps)
+          // Velocidade dinâmica baseada na distância exata para dar exatamente 12s o ciclo total
+          const totalDistance = maxScroll * 2; // ida + volta
+          const totalFrames = 12 * 60; 
+          const speed = totalDistance / totalFrames;
 
           function step() {
-            scrollPos += speed;
-            // Quando atingir a metade exata (já que duplicamos os itens no HTML), reinicia sem salto visual
-            if (scrollPos >= (track.scrollWidth / 2)) {
-              scrollPos = 0;
+            pos += speed * direction;
+
+            if (pos >= maxScroll) {
+              pos = maxScroll;
+              direction = -1; // inverte sentido (volta)
+            } else if (pos <= 0) {
+              pos = 0;
+              direction = 1; // inverte sentido (vai)
             }
-            track.style.transform = `translateX(-${scrollPos}px)`;
-            animationId = requestAnimationFrame(step);
+
+            track.style.transform = `translateX(-${pos}px)`;
+            container._animId = requestAnimationFrame(step);
           }
 
-          // Cancela animação anterior se houver
           if (container._animId) cancelAnimationFrame(container._animId);
-          animationId = requestAnimationFrame(step);
-          container._animId = animationId;
+          container._animId = requestAnimationFrame(step);
 
-          container.onmouseenter = () => cancelAnimationFrame(animationId);
-          container.onmouseleave = () => { animationId = requestAnimationFrame(step); };
+          container.onmouseenter = () => cancelAnimationFrame(container._animId);
+          container.onmouseleave = () => { container._animId = requestAnimationFrame(step); };
         });
       }, 150);
     }
