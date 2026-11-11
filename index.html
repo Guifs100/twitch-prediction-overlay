@@ -35,16 +35,16 @@
           },
           animation: {
             'glow-winner': 'glowWinner 1.5s ease-in-out infinite alternate',
-            'scroll-vertical': 'scrollVertical 12s linear infinite',
+            'marquee-left': 'marqueeLeft 15s linear infinite',
           },
           keyframes: {
             glowWinner: {
               '0%': { boxShadow: '0 0 15px rgba(16, 185, 129, 0.3)' },
               '100%': { boxShadow: '0 0 35px rgba(16, 185, 129, 0.8), 0 0 15px rgba(0, 245, 212, 0.5)' }
             },
-            scrollVertical: {
-              '0%': { transform: 'translateY(0)' },
-              '100%': { transform: 'translateY(-50%)' }
+            marqueeLeft: {
+              '0%': { transform: 'translateX(0%)' },
+              '100%': { transform: 'translateX(-50%)' }
             }
           }
         }
@@ -56,9 +56,14 @@
     body.overlay-only {
       background: transparent !important;
     }
+
+    /* ESCONDE NOTIFICAÇÕES TOAST NO MODO OBS */
+    body.overlay-only #toast {
+      display: none !important;
+    }
     
     .glass-panel {
-      background: rgba(18, 18, 23, 0.95);
+      background: rgba(18, 18, 23, 0.96);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -83,37 +88,34 @@
       transform: translateY(0) scale(1);
     }
 
-    /* CONTAINER COM LIMITE DE ALTURA PARA O OBS NÃO POLUIR A TELA */
-    .overlay-box-bounded {
-      max-width: 768px;
-      max-height: 600px;
-      overflow-y: auto;
+    /* CONTAINER SEM NENHUM SCROLL (ENCAIXE PERFEITO) */
+    .overlay-box-fixed {
+      width: 100%;
+      max-width: 740px;
+      max-height: 540px;
+      overflow: hidden !important;
     }
 
-    /* CONTAINER DE SCROLL CONTÍNUO DOS DEMAIS APOSTADORES */
-    .runner-up-scroll {
-      max-height: 75px;
+    /* TICKER MARQUEE HORIZONTAL */
+    .marquee-container {
+      width: 100%;
       overflow: hidden;
+      white-space: nowrap;
       position: relative;
     }
-    .runner-up-content {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      animation: scrollVertical 8s linear infinite;
+    .marquee-content {
+      display: inline-flex;
+      gap: 0.5rem;
+      animation: marqueeLeft 18s linear infinite;
     }
-    .runner-up-scroll:hover .runner-up-content {
+    .marquee-container:hover .marquee-content {
       animation-play-state: paused;
     }
-
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: #0e0e10; }
-    ::-webkit-scrollbar-thumb { background: #3a3a44; border-radius: 2px; }
   </style>
 </head>
 <body class="bg-[#09090b] text-gray-100 font-sans min-h-screen selection:bg-twitch-purple selection:text-white">
 
-  <!-- CABEÇALHO DA APLICAÇÃO -->
+  <!-- CABEÇALHO ADMIN -->
   <header id="app-header" class="bg-twitch-dark border-b border-twitch-border p-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
     <div class="flex items-center gap-3">
       <div class="bg-twitch-purple p-2 rounded-xl text-white shadow-lg shadow-twitch-purple/30">
@@ -121,9 +123,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v4.3 Compact Grid</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v5.0 Zero Scroll</span>
         </h1>
-        <p class="text-xs text-gray-400">Limites de Tamanho para OBS, Suporte de 2 a 10 opções</p>
+        <p class="text-xs text-gray-400">Layout compacto, sem scroll, Marquee do 4º lugar em diante e sem toast no OBS</p>
       </div>
     </div>
 
@@ -145,7 +147,7 @@
     </div>
   </header>
 
-  <!-- PAINEL PRINCIPAL -->
+  <!-- CONTAINER PRINCIPAL -->
   <main id="main-container" class="p-4 md:p-6 max-w-7xl mx-auto">
     <div id="dual-view" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
@@ -178,10 +180,13 @@
 
             <div>
               <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Opções (2 a 10)</label>
-                <button type="button" onclick="addOptionInput()" class="text-xs text-twitch-purple hover:underline flex items-center gap-1 font-semibold">
-                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Adicionar Opção
-                </button>
+                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Preset de Opções (2 a 10)</label>
+                <div class="flex gap-1">
+                  <button type="button" onclick="presetOptions(2)" class="text-[10px] bg-[#0e0e10] border border-twitch-border px-2 py-0.5 rounded text-gray-300 hover:text-white">2 Opções</button>
+                  <button type="button" onclick="presetOptions(4)" class="text-[10px] bg-[#0e0e10] border border-twitch-border px-2 py-0.5 rounded text-gray-300 hover:text-white">4 Opções</button>
+                  <button type="button" onclick="presetOptions(6)" class="text-[10px] bg-[#0e0e10] border border-twitch-border px-2 py-0.5 rounded text-gray-300 hover:text-white">6 Opções</button>
+                  <button type="button" onclick="presetOptions(10)" class="text-[10px] bg-[#0e0e10] border border-twitch-border px-2 py-0.5 rounded text-gray-300 hover:text-white">10 Opções</button>
+                </div>
               </div>
               <div id="options-input-container" class="space-y-2"></div>
             </div>
@@ -193,10 +198,11 @@
           </form>
         </div>
 
+        <!-- PAINEL DE SIMULAÇÃO AVANÇADA -->
         <div class="bg-twitch-card rounded-2xl border border-twitch-border p-5 shadow-xl space-y-4">
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i data-lucide="sliders" class="w-5 h-5 text-twitch-purple"></i>
-            Controle de Simulação
+            Controle de Simulação (Cenários)
           </h2>
 
           <div class="grid grid-cols-2 gap-2">
@@ -216,7 +222,10 @@
 
           <hr class="border-twitch-border my-2">
           <div>
-            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Encerrar & Vencedor</label>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Encerrar com Simulação Completa (10+ Pessoas)</label>
+            <button onclick="simulateHeavyResult()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-3 rounded-xl mb-2 flex items-center justify-center gap-1.5">
+              <i data-lucide="sparkles" class="w-4 h-4"></i> Simular Resultado com Muita Gente (Top 10+)
+            </button>
             <div id="resolve-controls" class="grid grid-cols-1 gap-2"></div>
           </div>
         </div>
@@ -234,19 +243,20 @@
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
-            <div id="overlay-widget-container" class="w-full overlay-box-bounded widget-animated widget-hidden"></div>
+            <div id="overlay-widget-container" class="w-full overlay-box-fixed widget-animated widget-hidden"></div>
           </div>
         </div>
       </section>
 
     </div>
 
-    <!-- STANDALONE OBS VIEW (ALTURA E LARGURA COMPACTAS) -->
+    <!-- STANDALONE OBS VIEW -->
     <div id="overlay-only-view" class="hidden min-h-screen flex items-center justify-center p-4">
-      <div id="overlay-standalone-container" class="w-full overlay-box-bounded widget-animated widget-hidden"></div>
+      <div id="overlay-standalone-container" class="w-full overlay-box-fixed widget-animated widget-hidden"></div>
     </div>
   </main>
 
+  <!-- TOAST (FICA OCULTO NO OBS MODO OVERLAY-ONLY) -->
   <div id="toast" class="fixed bottom-5 right-5 bg-twitch-purple text-white px-4 py-3 rounded-xl shadow-2xl transition-all transform translate-y-20 opacity-0 flex items-center gap-2 text-sm font-semibold z-50">
     <i data-lucide="check-circle" class="w-5 h-5"></i>
     <span id="toast-message">Mensagem</span>
@@ -560,13 +570,23 @@
       lucide.createIcons();
     }
 
+    function presetOptions(count) {
+      const presets = {
+        2: ['Sim', 'Não'],
+        4: ['Fácil (Vitória)', 'Médio (Suado)', 'Difícil (Overtime)', 'Derrota'],
+        6: ['Opção A', 'Opção B', 'Opção C', 'Opção D', 'Opção E', 'Opção F'],
+        10: ['Opção 1', 'Opção 2', 'Opção 3', 'Opção 4', 'Opção 5', 'Opção 6', 'Opção 7', 'Opção 8', 'Opção 9', 'Opção 10']
+      };
+      renderOptionInputs(presets[count] || presets[2]);
+    }
+
     function addOptionInput() {
       const inputs = Array.from(document.querySelectorAll('.option-input')).map(i => i.value);
       if (inputs.length < 10) {
         inputs.push(`Opção ${inputs.length + 1}`);
         renderOptionInputs(inputs);
       } else {
-        showToast("Limite máximo de 10 opções atingido!");
+        showToast("Limite de 10 opções!");
       }
     }
 
@@ -653,26 +673,20 @@
         if (opt.id === winnerId) {
           return {
             ...opt,
-            usersCount: opt.usersCount || 14,
+            usersCount: opt.usersCount || 6,
             topPredictors: [
               { name: 'Gaules', points: 5000, won: 12500 },
               { name: 'Alanzoka', points: 3500, won: 8750 },
-              { name: 'Guifs', points: 2000, won: 5000 },
-              { name: 'Mount', points: 1500, won: 3750 },
-              { name: 'Cellbit', points: 1000, won: 2500 },
-              { name: 'Rayan', points: 800, won: 2000 }
+              { name: 'Guifs', points: 2000, won: 5000 }
             ]
           };
         } else {
           return {
             ...opt,
-            usersCount: opt.usersCount || 8,
+            usersCount: opt.usersCount || 4,
             topPredictors: [
               { name: 'Casimiro', points: 4200, lost: 4200 },
-              { name: 'Nobru', points: 3000, lost: 3000 },
-              { name: 'PaulinhoOkb', points: 2000, lost: 2000 },
-              { name: 'Coringa', points: 1200, lost: 1200 },
-              { name: 'Loud_Luan', points: 800, lost: 800 }
+              { name: 'Nobru', points: 3000, lost: 3000 }
             ]
           };
         }
@@ -681,6 +695,59 @@
       updateState({ status: 'RESOLVED', winningOptionId: winnerId, options: updatedOptions, isVisible: true });
       try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch(err){}
       showToast("Palpite Encerrado!");
+      scheduleAutoHide(10000);
+    }
+
+    // SIMULAÇÃO COM MUITA GENTE (TOP 10+ GANHADORES E PERDEDORES)
+    function simulateHeavyResult() {
+      if (!predictionState.options || predictionState.options.length === 0) {
+        showToast("Inicie um palpite primeiro para simular!");
+        return;
+      }
+      clearTimeout(autoHideTimeout);
+      const winnerId = predictionState.options[0].id;
+
+      const heavyWinners = [
+        { name: 'Gaules', points: 10000, won: 25000 },
+        { name: 'Alanzoka', points: 7500, won: 18750 },
+        { name: 'Guifs', points: 5000, won: 12500 },
+        { name: 'Mount', points: 4000, won: 10000 },
+        { name: 'Cellbit', points: 3500, won: 8750 },
+        { name: 'Rayan', points: 3000, won: 7500 },
+        { name: 'Smitt', points: 2500, won: 6250 },
+        { name: 'Xandig', points: 2000, won: 5000 },
+        { name: 'Loud_Bradoock', points: 1500, won: 3750 },
+        { name: 'Luquie', points: 1000, won: 2500 }
+      ];
+
+      const heavyLosers = [
+        { name: 'Casimiro', points: 8000, lost: 8000 },
+        { name: 'Nobru', points: 6000, lost: 6000 },
+        { name: 'PaulinhoOkb', points: 5000, lost: 5000 },
+        { name: 'Coringa', points: 4000, lost: 4000 },
+        { name: 'Loud_Luan', points: 3500, lost: 3500 },
+        { name: 'Tequila', points: 2500, lost: 2500 },
+        { name: 'Cerol', points: 2000, lost: 2000 },
+        { name: 'Babi', points: 1500, lost: 1500 }
+      ];
+
+      const updatedOptions = predictionState.options.map((opt, idx) => {
+        if (idx === 0) {
+          return { ...opt, votes: 40500, usersCount: 24, topPredictors: heavyWinners };
+        } else {
+          return { ...opt, votes: 32500, usersCount: 18, topPredictors: heavyLosers };
+        }
+      });
+
+      updateState({ 
+        status: 'RESOLVED', 
+        winningOptionId: winnerId, 
+        options: updatedOptions, 
+        isVisible: true 
+      });
+
+      try { confetti({ particleCount: 140, spread: 90, origin: { y: 0.6 } }); } catch(err){}
+      showToast("Simulação de Multidão Aplicada!");
       scheduleAutoHide(10000);
     }
 
@@ -746,7 +813,7 @@
       }
     }
 
-    // RENDERIZADOR DO OVERLAY
+    // RENDERIZADOR DO OVERLAY (ZERO SCROLLBAR + MARQUEE HORIZONTAL PARA 4º LUGAR EM DIANTE)
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -755,8 +822,8 @@
         ? 'widget-visible' 
         : 'widget-hidden';
 
-      if (containerDual) containerDual.className = `w-full overlay-box-bounded widget-animated ${visibilityClass}`;
-      if (containerStandalone) containerStandalone.className = `w-full overlay-box-bounded widget-animated ${visibilityClass}`;
+      if (containerDual) containerDual.className = `w-full overlay-box-fixed widget-animated ${visibilityClass}`;
+      if (containerStandalone) containerStandalone.className = `w-full overlay-box-fixed widget-animated ${visibilityClass}`;
 
       if (!predictionState.options || predictionState.options.length === 0) {
         return;
@@ -791,35 +858,35 @@
       let statusBadge = '';
       if (predictionState.status === 'ACTIVE') {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-purple-900/60 text-purple-200 border border-purple-500/40 px-3 py-1 rounded-full text-xs font-bold animate-pulse whitespace-nowrap">
+          <div class="flex items-center gap-1.5 bg-purple-900/60 text-purple-200 border border-purple-500/40 px-2.5 py-0.5 rounded-full text-xs font-bold animate-pulse whitespace-nowrap">
             <i data-lucide="clock" class="w-3.5 h-3.5 text-twitch-accent"></i>
             <span>${formattedTime}</span>
           </div>
         `;
       } else if (predictionState.status === 'LOCKED') {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-amber-900/60 text-amber-200 border border-amber-500/40 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
+          <div class="flex items-center gap-1.5 bg-amber-900/60 text-amber-200 border border-amber-500/40 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap">
             <i data-lucide="lock" class="w-3.5 h-3.5"></i>
             <span>VOTAÇÕES ENCERRADAS</span>
           </div>
         `;
       } else if (predictionState.status === 'RESOLVED') {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-emerald-900/60 text-emerald-200 border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
+          <div class="flex items-center gap-1.5 bg-emerald-900/60 text-emerald-200 border border-emerald-500/40 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap">
             <i data-lucide="trophy" class="w-3.5 h-3.5"></i>
             <span>RESULTADO FINAL</span>
           </div>
         `;
       } else {
         statusBadge = `
-          <div class="flex items-center gap-1.5 bg-red-900/60 text-red-200 border border-red-500/40 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
+          <div class="flex items-center gap-1.5 bg-red-900/60 text-red-200 border border-red-500/40 px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap">
             <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
             <span>CANCELADO</span>
           </div>
         `;
       }
 
-      // PAINEL DE RESULTADO (REDESENHADO COM PODIUM TOP 3 + SCROLL DOS DEMAIS)
+      // PAINEL DE RESULTADO (PÓDIO TOP 3 FIXO + MARQUEE DO 4º EM DIANTE)
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
@@ -841,47 +908,21 @@
           if (rank === 3) { badgeColor = "bg-amber-700 text-white border-amber-600"; rowBg = "bg-emerald-950/50 border-emerald-500/20"; }
 
           return `
-            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 text-xs ${rowBg} border px-2 py-1 rounded-lg shadow-sm">
+            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-1.5 text-xs ${rowBg} border px-2 py-1 rounded-lg shadow-sm">
               <div class="w-4 h-4 rounded-full ${badgeColor} border font-black text-[9px] flex items-center justify-center shrink-0">
                 ${rank}º
               </div>
               <div class="min-w-0">
-                <div class="font-bold text-white truncate text-xs">${escapeHtml(p.name)}</div>
+                <div class="font-bold text-white truncate text-[11px]">${escapeHtml(p.name)}</div>
                 <div class="text-[8px] text-gray-400 truncate">Apostou ${p.points.toLocaleString('pt-BR')} pts</div>
               </div>
-              <div class="text-right whitespace-nowrap pl-2">
-                <span class="font-extrabold text-emerald-400 block text-xs">+${totalGanhos.toLocaleString('pt-BR')} pts</span>
-                <span class="text-[8px] text-emerald-300/80 font-semibold">(+${lucroLiquido.toLocaleString('pt-BR')} lucro)</span>
+              <div class="text-right whitespace-nowrap pl-1">
+                <span class="font-extrabold text-emerald-400 block text-[11px]">+${totalGanhos.toLocaleString('pt-BR')}</span>
+                <span class="text-[8px] text-emerald-300/80 font-semibold">(+${lucroLiquido.toLocaleString('pt-BR')})</span>
               </div>
             </div>
           `;
         }).join('');
-
-        let restWinnersTickerHTML = '';
-        if (restWinners.length > 0) {
-          const listToScroll = restWinners.length > 2 ? [...restWinners, ...restWinners] : restWinners;
-          const itemsHTML = listToScroll.map((p, idx) => {
-            const realRank = (idx % restWinners.length) + 4;
-            const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
-            return `
-              <div class="flex items-center justify-between text-[10px] bg-emerald-950/30 border border-emerald-500/10 px-2 py-0.5 rounded">
-                <span class="text-gray-300 truncate"><strong class="text-emerald-400/80 mr-1">${realRank}º</strong> ${escapeHtml(p.name)}</span>
-                <span class="text-emerald-400 font-bold whitespace-nowrap pl-2">+${totalGanhos.toLocaleString('pt-BR')} pts</span>
-              </div>
-            `;
-          }).join('');
-
-          restWinnersTickerHTML = `
-            <div class="mt-1 pt-1 border-t border-emerald-500/20">
-              <div class="text-[8px] uppercase font-bold text-emerald-400/70 mb-0.5">Outros Vencedores</div>
-              <div class="runner-up-scroll rounded bg-black/40 p-1">
-                <div class="runner-up-content">
-                  ${itemsHTML}
-                </div>
-              </div>
-            </div>
-          `;
-        }
 
         // --- PROCESSA PERDEDORES ---
         const loserPredictors = loserOptions.flatMap(o => o.topPredictors || []);
@@ -895,41 +936,60 @@
           const lostPts = p.points || p.lost || 0;
 
           return `
-            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 text-xs bg-red-950/50 border border-red-500/30 px-2 py-1 rounded-lg shadow-sm">
+            <div class="grid grid-cols-[auto_1fr_auto] items-center gap-1.5 text-xs bg-red-950/50 border border-red-500/30 px-2 py-1 rounded-lg shadow-sm">
               <div class="w-4 h-4 rounded-full bg-red-900/80 text-red-200 border border-red-500/40 font-black text-[9px] flex items-center justify-center shrink-0">
                 ${rank}º
               </div>
               <div class="min-w-0">
-                <div class="font-bold text-gray-200 truncate text-xs">${escapeHtml(p.name)}</div>
-                <div class="text-[8px] text-gray-400 truncate">Aposta Perfeita</div>
+                <div class="font-bold text-gray-200 truncate text-[11px]">${escapeHtml(p.name)}</div>
+                <div class="text-[8px] text-gray-400 truncate">Perdeu aposta</div>
               </div>
-              <div class="text-right whitespace-nowrap pl-2">
-                <span class="font-extrabold text-red-400 block text-xs">-${lostPts.toLocaleString('pt-BR')} pts</span>
+              <div class="text-right whitespace-nowrap pl-1">
+                <span class="font-extrabold text-red-400 block text-[11px]">-${lostPts.toLocaleString('pt-BR')} pts</span>
               </div>
             </div>
           `;
         }).join('');
 
-        let restLosersTickerHTML = '';
-        if (restLosers.length > 0) {
-          const listToScroll = restLosers.length > 2 ? [...restLosers, ...restLosers] : restLosers;
-          const itemsHTML = listToScroll.map((p, idx) => {
-            const realRank = (idx % restLosers.length) + 4;
-            const lostPts = p.points || p.lost || 0;
-            return `
-              <div class="flex items-center justify-between text-[10px] bg-red-950/30 border border-red-500/10 px-2 py-0.5 rounded">
-                <span class="text-gray-400 truncate"><strong class="text-red-400/80 mr-1">${realRank}º</strong> ${escapeHtml(p.name)}</span>
-                <span class="text-red-400 font-bold whitespace-nowrap pl-2">-${lostPts.toLocaleString('pt-BR')} pts</span>
-              </div>
-            `;
+        // TICKER MARQUEE CONTINUO (DO 4º LUGAR EM DIANTE COMBINADO)
+        let combinedMarqueeHTML = '';
+        const allRest = [
+          ...restWinners.map((p, i) => ({ ...p, rank: i + 4, isWin: true })),
+          ...restLosers.map((p, i) => ({ ...p, rank: i + 4, isWin: false }))
+        ];
+
+        if (allRest.length > 0) {
+          const listToScroll = [...allRest, ...allRest]; // DUPLICA PARA LOOP INFINITO CONTINUO
+          const marqueeBadges = listToScroll.map(p => {
+            if (p.isWin) {
+              const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
+              return `
+                <span class="inline-flex items-center gap-1 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px]">
+                  <strong class="text-emerald-400">${p.rank}º</strong>
+                  <span class="text-white font-semibold">${escapeHtml(p.name)}</span>
+                  <span class="text-emerald-400 font-extrabold">+${totalGanhos.toLocaleString('pt-BR')}</span>
+                </span>
+              `;
+            } else {
+              const lostPts = p.points || p.lost || 0;
+              return `
+                <span class="inline-flex items-center gap-1 bg-red-950/60 border border-red-500/30 px-2 py-0.5 rounded text-[10px]">
+                  <strong class="text-red-400">${p.rank}º</strong>
+                  <span class="text-gray-300 font-medium">${escapeHtml(p.name)}</span>
+                  <span class="text-red-400 font-extrabold">-${lostPts.toLocaleString('pt-BR')}</span>
+                </span>
+              `;
+            }
           }).join('');
 
-          restLosersTickerHTML = `
-            <div class="mt-1 pt-1 border-t border-red-500/20">
-              <div class="text-[8px] uppercase font-bold text-red-400/70 mb-0.5">Outros Apostadores</div>
-              <div class="runner-up-scroll rounded bg-black/40 p-1">
-                <div class="runner-up-content">
-                  ${itemsHTML}
+          combinedMarqueeHTML = `
+            <div class="mt-2 pt-1 border-t border-white/10">
+              <div class="text-[8px] uppercase font-bold text-gray-400 mb-0.5 flex items-center gap-1">
+                <i data-lucide="users" class="w-2.5 h-2.5 text-twitch-purple"></i> Demais Participantes (do 4º lugar em diante)
+              </div>
+              <div class="marquee-container bg-black/50 py-1 rounded border border-white/5">
+                <div class="marquee-content">
+                  ${marqueeBadges}
                 </div>
               </div>
             </div>
@@ -937,59 +997,57 @@
         }
 
         resultDetailsHTML = `
-          <div class="mb-3 p-3 rounded-xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/40 to-emerald-950/90 border border-emerald-500/40 shadow-lg animate-glow-winner space-y-2">
+          <div class="mb-2.5 p-2.5 rounded-xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/40 to-emerald-950/90 border border-emerald-500/40 shadow-lg animate-glow-winner space-y-2">
             
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-1.5">
-              <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-1">
+              <div class="flex items-center gap-1.5">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 font-bold shrink-0">
                   <i data-lucide="coins" class="w-3.5 h-3.5"></i>
                 </div>
                 <div>
-                  <div class="text-[11px] uppercase font-extrabold text-emerald-400 tracking-wider whitespace-nowrap">Resultado da Distribuição</div>
-                  <div class="text-[11px] text-white">Opção Vencedora: <strong class="text-emerald-300 uppercase">${escapeHtml(winnerOption.title)}</strong> (${winnerOption.usersCount || 0} apostadores)</div>
+                  <div class="text-[10px] uppercase font-extrabold text-emerald-400 tracking-wider whitespace-nowrap">Resultado da Distribuição</div>
+                  <div class="text-[10px] text-white">Opção Vencedora: <strong class="text-emerald-300 uppercase">${escapeHtml(winnerOption.title)}</strong> (${winnerOption.usersCount || 0} apostadores)</div>
                 </div>
               </div>
 
-              <div class="bg-black/50 border border-emerald-500/30 px-2.5 py-0.5 rounded-lg text-right whitespace-nowrap">
-                <div class="text-[9px] text-gray-400 font-bold uppercase">Retorno p/ 1k pts</div>
+              <div class="bg-black/50 border border-emerald-500/30 px-2 py-0.5 rounded-lg text-right whitespace-nowrap">
+                <div class="text-[8px] text-gray-400 font-bold uppercase">Retorno p/ 1k pts</div>
                 <div class="text-xs font-black text-emerald-400 font-display">+${returnPer1k.toLocaleString('pt-BR')} pts</div>
               </div>
             </div>
 
-            <!-- PÓDIOS COM LAYOUT COMPACTO -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-0.5">
+            <!-- PÓDIOS TOP 3 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-0.5">
               
-              <!-- GANHADORES -->
               <div class="space-y-1">
-                <div class="text-[9px] font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between whitespace-nowrap">
+                <div class="text-[8px] font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between whitespace-nowrap">
                   <span class="flex items-center gap-1"><i data-lucide="trophy" class="w-3 h-3"></i> Pódio Ganhadores</span>
                   <span class="text-[8px] text-emerald-300/70 font-normal">+${loserVotes.toLocaleString('pt-BR')} pts divididos</span>
                 </div>
                 <div class="space-y-1">
-                  ${top3WinnersHTML || '<div class="text-[10px] text-gray-400 italic">Sem dados de ganhadores</div>'}
+                  ${top3WinnersHTML || '<div class="text-[9px] text-gray-400 italic">Sem dados de ganhadores</div>'}
                 </div>
-                ${restWinnersTickerHTML}
               </div>
 
-              <!-- PERDEDORES -->
               <div class="space-y-1">
-                <div class="text-[9px] font-black uppercase tracking-wider text-red-400 flex items-center justify-between whitespace-nowrap">
+                <div class="text-[8px] font-black uppercase tracking-wider text-red-400 flex items-center justify-between whitespace-nowrap">
                   <span class="flex items-center gap-1"><i data-lucide="trending-down" class="w-3 h-3"></i> Pódio Perdedores</span>
                   <span class="text-[8px] text-red-300/70 font-normal">${loserVotes.toLocaleString('pt-BR')} pts perdidos</span>
                 </div>
                 <div class="space-y-1">
-                  ${top3LosersHTML || '<div class="text-[10px] text-gray-400 italic">Sem dados de perdedores</div>'}
+                  ${top3LosersHTML || '<div class="text-[9px] text-gray-400 italic">Sem dados de perdedores</div>'}
                 </div>
-                ${restLosersTickerHTML}
               </div>
 
             </div>
+
+            ${combinedMarqueeHTML}
 
           </div>
         `;
       }
 
-      // GRADE DINÂMICA DE ACORDO COM O NÚMERO DE OPÇÕES (2 a 10)
+      // GRADE ADAPTATIVA INTELIGENTE (SEM SCROLLBAR)
       const optionsCount = predictionState.options.length;
       let gridColumnsClass = "grid-cols-1 md:grid-cols-2";
       if (optionsCount === 3) gridColumnsClass = "grid-cols-1 md:grid-cols-3";
@@ -1015,14 +1073,14 @@
           if (isWinner) {
             cardStyle = "bg-gradient-to-br from-emerald-950/90 via-emerald-900/50 to-emerald-950/80 border-2 border-emerald-400 shadow-xl shadow-emerald-500/20 scale-[1.01]";
             badgeResult = `
-              <span class="bg-emerald-500 text-black font-black text-[9px] px-1.5 py-0.2 rounded tracking-wider uppercase flex items-center gap-0.5 shadow-md whitespace-nowrap">
+              <span class="bg-emerald-500 text-black font-black text-[8px] px-1 py-0.2 rounded tracking-wider uppercase flex items-center gap-0.5 shadow-md whitespace-nowrap">
                 <i data-lucide="trophy" class="w-2.5 h-2.5"></i> Vencedor
               </span>
             `;
           } else {
             cardStyle = "opacity-40 grayscale-[50%] glass-card border-red-500/30";
             badgeResult = `
-              <span class="bg-red-500/20 text-red-400 border border-red-500/40 font-bold text-[9px] px-1.5 py-0.2 rounded tracking-wider uppercase whitespace-nowrap">
+              <span class="bg-red-500/20 text-red-400 border border-red-500/40 font-bold text-[8px] px-1 py-0.2 rounded tracking-wider uppercase whitespace-nowrap">
                 Perdedor
               </span>
             `;
@@ -1030,29 +1088,29 @@
         }
 
         optionsCardsHTML += `
-          <div class="${isCompact ? 'p-2.5' : 'p-3.5'} rounded-xl transition-all duration-300 ${cardStyle} flex flex-col justify-between relative overflow-hidden">
+          <div class="${isCompact ? 'p-2' : 'p-3'} rounded-xl transition-all duration-300 ${cardStyle} flex flex-col justify-between relative overflow-hidden">
             <div class="absolute left-0 top-0 bottom-0 w-1 ${opt.color.bg}"></div>
 
-            <div class="flex items-start justify-between gap-1 mb-1 pl-1.5">
-              <span class="font-display font-extrabold ${isCompact ? 'text-sm' : 'text-base md:text-lg'} text-white tracking-wide uppercase line-clamp-1">
+            <div class="flex items-start justify-between gap-1 mb-1 pl-1">
+              <span class="font-display font-extrabold ${isCompact ? 'text-xs' : 'text-sm md:text-base'} text-white tracking-wide uppercase line-clamp-1">
                 ${escapeHtml(opt.title)}
               </span>
               ${badgeResult}
             </div>
 
-            <div class="flex items-end justify-between pl-1.5 mt-1">
+            <div class="flex items-end justify-between pl-1 mt-0.5">
               <div>
-                <div class="${isCompact ? 'text-xl' : 'text-2xl md:text-3xl'} font-black text-white font-display tracking-tight flex items-baseline gap-0.5">
-                  ${pct}<span class="text-xs font-bold text-gray-400">%</span>
+                <div class="${isCompact ? 'text-lg' : 'text-xl md:text-2xl'} font-black text-white font-display tracking-tight flex items-baseline gap-0.5">
+                  ${pct}<span class="text-[10px] font-bold text-gray-400">%</span>
                 </div>
-                <div class="text-[10px] text-gray-400 font-medium flex items-center gap-1 flex-wrap">
+                <div class="text-[9px] text-gray-400 font-medium flex items-center gap-0.5 flex-wrap">
                   <span class="flex items-center gap-0.5 text-gray-300 font-semibold"><i data-lucide="users" class="w-2.5 h-2.5 text-twitch-purple"></i> ${participantsCount}</span>
                   <span class="text-gray-500">•</span>
                   <span>${formattedVotes} pts</span>
                 </div>
               </div>
 
-              <div class="${isCompact ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-xs'} shrink-0 rounded-full ${opt.color.bg}/20 border ${opt.color.border} flex items-center justify-center ${opt.color.text} font-bold overflow-hidden">
+              <div class="${isCompact ? 'w-5 h-5 text-[9px]' : 'w-6 h-6 text-xs'} shrink-0 rounded-full ${opt.color.bg}/20 border ${opt.color.border} flex items-center justify-center ${opt.color.text} font-bold overflow-hidden">
                 ${displayIndex}
               </div>
             </div>
@@ -1061,15 +1119,15 @@
       });
 
       const widgetHTML = `
-        <div class="glass-panel p-4 md:p-5 rounded-2xl shadow-2xl border border-white/10 relative overflow-hidden">
+        <div class="glass-panel p-3.5 md:p-4 rounded-2xl shadow-2xl border border-white/10 relative overflow-hidden">
           <div class="absolute -top-24 -right-24 w-48 h-48 bg-twitch-purple/20 rounded-full blur-3xl pointer-events-none"></div>
 
-          <div class="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-white/10">
+          <div class="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/10">
             <div class="flex items-center gap-2 min-w-0">
               <div class="bg-twitch-purple p-1 rounded-lg text-white shadow-md shadow-twitch-purple/40 shrink-0">
                 <i data-lucide="help-circle" class="w-4 h-4"></i>
               </div>
-              <h3 class="font-display font-extrabold text-base md:text-lg text-white tracking-wide uppercase truncate">
+              <h3 class="font-display font-extrabold text-sm md:text-base text-white tracking-wide uppercase truncate">
                 ${escapeHtml(predictionState.title)}
               </h3>
             </div>
@@ -1078,11 +1136,11 @@
 
           ${resultDetailsHTML}
 
-          <div class="mb-3">
-            <div class="h-3 w-full bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex items-center gap-0.5 shadow-inner">
+          <div class="mb-2.5">
+            <div class="h-2.5 w-full bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/10 flex items-center gap-0.5 shadow-inner">
               ${progressBarSegments}
             </div>
-            <div class="flex justify-between items-center mt-1 text-[10px] font-semibold text-gray-400 px-0.5 flex-wrap gap-1">
+            <div class="flex justify-between items-center mt-1 text-[9px] font-semibold text-gray-400 px-0.5 flex-wrap gap-1">
               <span>Total Apostado: <strong class="text-white">${totalVotes.toLocaleString('pt-BR')} pts</strong></span>
               <span class="flex items-center gap-1 text-twitch-accent font-bold">
                 <i data-lucide="users" class="w-2.5 h-2.5"></i> ${totalParticipants} Participantes na Live
@@ -1090,11 +1148,11 @@
             </div>
           </div>
 
-          <div class="grid ${gridColumnsClass} gap-2">
+          <div class="grid ${gridColumnsClass} gap-1.5">
             ${optionsCardsHTML}
           </div>
 
-          <div class="mt-3 pt-1.5 flex items-center justify-between text-[9px] text-gray-500 font-medium border-t border-white/5">
+          <div class="mt-2 pt-1 flex items-center justify-between text-[8px] text-gray-500 font-medium border-t border-white/5">
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-twitch-purple"></span> Twitch Predictions Overlay
             </span>
@@ -1146,6 +1204,9 @@
     }
 
     function showToast(message) {
+      // Se estiver no modo OBS exclusivo, ignora o Toast
+      if (document.body.classList.contains('overlay-only')) return;
+
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toast-message');
       toastMsg.innerText = message;
