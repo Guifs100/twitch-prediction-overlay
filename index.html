@@ -35,11 +35,16 @@
           },
           animation: {
             'glow-winner': 'glowWinner 1.5s ease-in-out infinite alternate',
+            'scroll-vertical': 'scrollVertical 12s linear infinite',
           },
           keyframes: {
             glowWinner: {
               '0%': { boxShadow: '0 0 15px rgba(16, 185, 129, 0.3)' },
               '100%': { boxShadow: '0 0 35px rgba(16, 185, 129, 0.8), 0 0 15px rgba(0, 245, 212, 0.5)' }
+            },
+            scrollVertical: {
+              '0%': { transform: 'translateY(0)' },
+              '100%': { transform: 'translateY(-50%)' }
             }
           }
         }
@@ -65,7 +70,7 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /* ANIMAÇÃO ESTÁVEL DE VISIBILIDADE DA STATE MACHINE */
+    /* TRANSITION E ANIMAÇÃO DA STATE MACHINE */
     .widget-animated {
       transition: opacity 0.4s ease-out, transform 0.4s ease-out;
     }
@@ -79,25 +84,30 @@
       transform: translateY(0) scale(1);
     }
 
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+    /* CONTAINER COM SCROLL AUTOMÁTICO EM LOOP */
+    .scroll-container {
+      max-height: 160px;
+      overflow: hidden;
+      position: relative;
     }
-    ::-webkit-scrollbar-track {
-      background: #0e0e10;
+    .scroll-container:hover .scroll-content {
+      animation-play-state: paused;
     }
-    ::-webkit-scrollbar-thumb {
-      background: #3a3a44;
-      border-radius: 3px;
+    .scroll-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+      animation: scrollVertical 10s linear infinite;
     }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #9146FF;
-    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0e0e10; }
+    ::-webkit-scrollbar-thumb { background: #3a3a44; border-radius: 2px; }
   </style>
 </head>
 <body class="bg-[#09090b] text-gray-100 font-sans min-h-screen selection:bg-twitch-purple selection:text-white">
 
-  <!-- CABEÇALHO SUPERIOR -->
+  <!-- CABEÇALHO DA APLICAÇÃO -->
   <header id="app-header" class="bg-twitch-dark border-b border-twitch-border p-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
     <div class="flex items-center gap-3">
       <div class="bg-twitch-purple p-2 rounded-xl text-white shadow-lg shadow-twitch-purple/30">
@@ -105,14 +115,13 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">Twitch Engine v3</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">Twitch Engine v4</span>
         </h1>
-        <p class="text-xs text-gray-400">Sincronização em tempo real e auto-hide de 15s</p>
+        <p class="text-xs text-gray-400">Estado inicial oculto, Top 3 e auto-hide de 10s</p>
       </div>
     </div>
 
     <div class="flex items-center gap-2">
-      <!-- Status da Conexão WebSocket -->
       <div id="connection-status" class="flex items-center gap-1.5 bg-[#0e0e10] border border-twitch-border px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-400">
         <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse" id="status-dot"></span>
         <span id="status-text">Conectando à Twitch...</span>
@@ -130,11 +139,11 @@
     </div>
   </header>
 
-  <!-- CONTAINER PRINCIPAL -->
+  <!-- PAINEL PRINCIPAL -->
   <main id="main-container" class="p-4 md:p-6 max-w-7xl mx-auto">
     <div id="dual-view" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
-      <!-- PAINEL LOCAL -->
+      <!-- CONTROLES LOCAIS -->
       <section class="lg:col-span-5 space-y-6">
         <div class="bg-twitch-card rounded-2xl border border-twitch-border p-5 shadow-xl">
           <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -207,7 +216,7 @@
         </div>
       </section>
 
-      <!-- VISUALIZAÇÃO PRÉVIA OVERLAY -->
+      <!-- PREVIEW NO ADMIN -->
       <section class="lg:col-span-7 flex flex-col">
         <div class="bg-twitch-card/60 rounded-2xl border border-twitch-border p-4 flex-1 flex flex-col">
           <div class="flex items-center justify-between mb-4">
@@ -215,24 +224,24 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS)
             </span>
-            <span class="text-xs text-gray-500">Auto-Hide 15s</span>
+            <span class="text-xs text-gray-500">Auto-Hide 10s ao encerrar</span>
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
-            <div id="overlay-widget-container" class="w-full max-w-2xl widget-animated widget-visible"></div>
+            <div id="overlay-widget-container" class="w-full max-w-2xl widget-animated widget-hidden"></div>
           </div>
         </div>
       </section>
 
     </div>
 
-    <!-- MODO OVERLAY EXCLUSIVO -->
+    <!-- MODO STANDALONE PARA OBS BROWSER SOURCE -->
     <div id="overlay-only-view" class="hidden min-h-screen flex items-center justify-center p-4">
-      <div id="overlay-standalone-container" class="w-full max-w-3xl widget-animated widget-visible"></div>
+      <div id="overlay-standalone-container" class="w-full max-w-3xl widget-animated widget-hidden"></div>
     </div>
   </main>
 
-  <!-- TOAST NOTIFICATION -->
+  <!-- TOAST -->
   <div id="toast" class="fixed bottom-5 right-5 bg-twitch-purple text-white px-4 py-3 rounded-xl shadow-2xl transition-all transform translate-y-20 opacity-0 flex items-center gap-2 text-sm font-semibold z-50">
     <i data-lucide="check-circle" class="w-5 h-5"></i>
     <span id="toast-message">Mensagem</span>
@@ -252,28 +261,15 @@
       { name: 'Laranja', hex: '#FF9F1C', bg: 'bg-[#FF9F1C]', text: 'text-[#FF9F1C]', border: 'border-[#FF9F1C]' }
     ];
 
+    // ESTADO INICIAL COMPLETAMENTE OCULTO (IDLE + ISVISIBLE FALSE)
     let predictionState = {
-      title: "O streamer vai passar de fase?",
-      status: "ACTIVE", // ACTIVE, LOCKED, RESOLVED, CANCELLED
-      totalDuration: 120,
-      remainingTime: 120,
+      title: "",
+      status: "IDLE", // IDLE, ACTIVE, LOCKED, RESOLVED, CANCELLED
+      totalDuration: 0,
+      remainingTime: 0,
       winningOptionId: null,
-      isVisible: true,
-      options: [
-        { 
-          id: '1', twitchId: '', title: 'Sim', votes: 14500, color: OPTION_COLORS[0],
-          topPredictors: [
-            { name: 'Gaules', points: 5000, won: 12500 },
-            { name: 'Alanzoka', points: 3500, won: 8750 }
-          ]
-        },
-        { 
-          id: '2', twitchId: '', title: 'Não', votes: 8200, color: OPTION_COLORS[1],
-          topPredictors: [
-            { name: 'Casimiro', points: 4200, lost: 4200 }
-          ]
-        }
-      ]
+      isVisible: false,
+      options: []
     };
 
     let timerInterval = null;
@@ -287,9 +283,8 @@
         enableOverlayOnlyMode();
       }
 
-      renderOptionInputs([predictionState.options[0]?.title || 'Sim', predictionState.options[1]?.title || 'Não']);
+      renderOptionInputs(['Sim', 'Não']);
       renderApp();
-      startTimerIfNeeded();
 
       broadcastChannel.onmessage = (event) => {
         if (event.data) {
@@ -302,8 +297,7 @@
       lucide.createIcons();
     };
 
-    // MÁQUINA DE ESTADOS - RESET COMPLETO
-    function resetStateMachine(newStatus = 'ACTIVE') {
+    function resetStateMachine(newStatus = 'IDLE') {
       clearInterval(timerInterval);
       clearTimeout(autoHideTimeout);
       timerInterval = null;
@@ -311,7 +305,7 @@
 
       predictionState.status = newStatus;
       predictionState.winningOptionId = null;
-      predictionState.isVisible = true; // FORÇA VISÍVEL AO REINICIAR
+      predictionState.isVisible = (newStatus !== 'IDLE');
     }
 
     function connectTwitchEventSub() {
@@ -319,7 +313,7 @@
       twitchSocket = new WebSocket('wss://eventsub.wss.twitch.tv/ws');
 
       twitchSocket.onopen = () => {
-        console.log('✅ Conectado ao WebSocket do EventSub da Twitch!');
+        console.log('✅ Conectado ao WebSocket EventSub da Twitch!');
       };
 
       twitchSocket.onmessage = async (event) => {
@@ -328,7 +322,6 @@
 
         if (messageType === 'session_welcome') {
           const sessionId = response.payload.session.id;
-          console.log('🔑 Session ID obtido:', sessionId);
           updateConnectionStatus('connected', 'Conectado à Twitch');
 
           await subscribeToEvent(sessionId, 'channel.prediction.begin');
@@ -364,8 +357,6 @@
         const data = await res.json();
         if (res.ok) {
           console.log(`📡 Inscrito no evento: ${eventType}`);
-        } else {
-          console.error(`❌ Erro ao inscrever ${eventType}:`, data);
         }
       } catch (error) {
         console.error('❌ Erro de conexão com Vercel:', error);
@@ -375,7 +366,7 @@
     // PROCESSAMENTO DOS EVENTOS TWITCH
     function handleTwitchPredictionNotification(type, event) {
       
-      // 1. PALPITE INICIADO NA TWITCH
+      // 1. INÍCIO DO PALPITE
       if (type === 'channel.prediction.begin') {
         resetStateMachine('ACTIVE');
 
@@ -405,10 +396,10 @@
         });
 
         startTimerIfNeeded();
-        showToast(`Novo Palpite na Twitch: "${event.title}"`);
+        showToast(`Novo Palpite: "${event.title}"`);
       }
 
-      // 2. PROGRESSO DE VOTOS NA TWITCH
+      // 2. PROGRESSO DE VOTOS
       if (type === 'channel.prediction.progress') {
         const mappedOptions = event.outcomes.map((o, idx) => ({
           id: String(idx + 1),
@@ -437,18 +428,15 @@
         });
       }
 
-      // 3. FIM DO PALPITE NA TWITCH (RESULTADO OU CANCELAMENTO)
+      // 3. RESULTADO / FIM DO PALPITE
       if (type === 'channel.prediction.end') {
         clearTimeout(autoHideTimeout);
         
         const winningId = event.winning_outcome_id;
-
-        // Trata "RESOLVED", "CANCELED" ou a presença direta de um winning_outcome_id
         const rawStatus = String(event.status || '').toUpperCase();
         const isResolved = rawStatus === 'RESOLVED' || Boolean(winningId);
         const status = isResolved ? 'RESOLVED' : 'CANCELLED';
 
-        // Localiza a opção vencedora por UUID ou ID sequencial ("1", "2"...)
         const winnerOpt = predictionState.options.find(o => 
           (o.twitchId && o.twitchId === winningId) || o.id === String(winningId)
         );
@@ -474,7 +462,6 @@
           return { ...opt, topPredictors: predictors };
         });
 
-        // Força o overlay a reaparecer e exibir o painel de ganhadores
         updateState({
           status: status,
           winningOptionId: resolvedWinnerId,
@@ -484,20 +471,18 @@
 
         if (status === 'RESOLVED') {
           try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch(e){}
-          showToast("Palpite Encerrado com Sucesso!");
-        } else {
-          showToast("Palpite Cancelado na Twitch.");
+          showToast("Palpite Encerrado!");
         }
 
-        // Esconde o overlay suavemente após 15 segundos
-        scheduleAutoHide(15000);
+        // ESCONDE APÓS 10 SEGUNDOS EXIBINDO O RESULTADO E RESETA
+        scheduleAutoHide(10000);
       }
     }
 
-    function scheduleAutoHide(delayMs = 15000) {
+    function scheduleAutoHide(delayMs = 10000) {
       clearTimeout(autoHideTimeout);
       autoHideTimeout = setTimeout(() => {
-        updateState({ isVisible: false });
+        updateState({ isVisible: false, status: 'IDLE' });
       }, delayMs);
     }
 
@@ -536,9 +521,9 @@
             predictionState.remainingTime = 0;
             predictionState.status = 'LOCKED';
             clearInterval(timerInterval);
-            showToast("Votações encerradas! Escondendo em 15s...");
+            showToast("Votações enceradas!");
             updateState(predictionState);
-            scheduleAutoHide(15000);
+            scheduleAutoHide(10000);
           }
         }, 1000);
       }
@@ -572,8 +557,6 @@
       if (inputs.length < 6) {
         inputs.push(`Opção ${inputs.length + 1}`);
         renderOptionInputs(inputs);
-      } else {
-        showToast("Máximo de 6 opções!");
       }
     }
 
@@ -618,7 +601,7 @@
       });
 
       startTimerIfNeeded();
-      showToast("Palpite Local Criado!");
+      showToast("Palpite Criado!");
     }
 
     function lockPrediction() {
@@ -626,22 +609,19 @@
         clearInterval(timerInterval);
         updateState({ status: 'LOCKED', remainingTime: 0, isVisible: true });
         showToast("Votações trancadas!");
-        scheduleAutoHide(15000);
+        scheduleAutoHide(10000);
       }
     }
 
     function cancelPrediction() {
       resetStateMachine('CANCELLED');
       updateState({ status: 'CANCELLED', remainingTime: 0, winningOptionId: null, isVisible: true });
-      showToast("Palpite cancelado/resetado!");
-      scheduleAutoHide(4000);
+      showToast("Palpite cancelado!");
+      scheduleAutoHide(3000);
     }
 
     function addVotes(optionId, amount) {
-      if (predictionState.status !== 'ACTIVE') {
-        showToast("A votação precisa estar ATIVA para votar!");
-        return;
-      }
+      if (predictionState.status !== 'ACTIVE') return;
       const updatedOptions = predictionState.options.map(opt => {
         if (opt.id === optionId) {
           return { ...opt, votes: opt.votes + amount };
@@ -653,10 +633,37 @@
 
     function resolvePrediction(winnerId) {
       clearTimeout(autoHideTimeout);
-      updateState({ status: 'RESOLVED', winningOptionId: winnerId, isVisible: true });
+      
+      // MOCK DE GANHADORES/PERDEDORES NO TESTE LOCAL
+      const updatedOptions = predictionState.options.map(opt => {
+        if (opt.id === winnerId) {
+          return {
+            ...opt,
+            topPredictors: [
+              { name: 'Gaules', points: 5000, won: 12500 },
+              { name: 'Alanzoka', points: 3500, won: 8750 },
+              { name: 'Guifs', points: 2000, won: 5000 },
+              { name: 'Mount', points: 1500, won: 3750 },
+              { name: 'Cellbit', points: 1000, won: 2500 }
+            ]
+          };
+        } else {
+          return {
+            ...opt,
+            topPredictors: [
+              { name: 'Casimiro', points: 4200, lost: 4200 },
+              { name: 'Nobru', points: 3000, lost: 3000 },
+              { name: 'PaulinhoOkb', points: 2000, lost: 2000 },
+              { name: 'Coringa', points: 1200, lost: 1200 }
+            ]
+          };
+        }
+      });
+
+      updateState({ status: 'RESOLVED', winningOptionId: winnerId, options: updatedOptions, isVisible: true });
       try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch(err){}
-      showToast("Predição Encerrada!");
-      scheduleAutoHide(15000);
+      showToast("Palpite Encerrado!");
+      scheduleAutoHide(10000);
     }
 
     function renderApp() {
@@ -682,9 +689,9 @@
               ${escapeHtml(opt.title)}
             </span>
             <div class="flex items-center gap-1">
-              <button onclick="addVotes('${opt.id}', 100)" class="bg-twitch-card hover:bg-gray-800 text-[10px] font-bold py-1 px-2 rounded-lg border border-twitch-border text-gray-300 transition-all">+100</button>
-              <button onclick="addVotes('${opt.id}', 1000)" class="bg-twitch-card hover:bg-gray-800 text-[10px] font-bold py-1 px-2 rounded-lg border border-twitch-border text-twitch-purple transition-all">+1k</button>
-              <button onclick="addVotes('${opt.id}', 5000)" class="bg-twitch-card hover:bg-gray-800 text-[10px] font-bold py-1 px-2 rounded-lg border border-twitch-border text-emerald-400 transition-all">+5k</button>
+              <button onclick="addVotes('${opt.id}', 100)" class="bg-twitch-card hover:bg-gray-800 text-[10px] font-bold py-1 px-2 rounded-lg border border-twitch-border text-gray-300">+100</button>
+              <button onclick="addVotes('${opt.id}', 1000)" class="bg-twitch-card hover:bg-gray-800 text-[10px] font-bold py-1 px-2 rounded-lg border border-twitch-border text-twitch-purple">+1k</button>
+              <button onclick="addVotes('${opt.id}', 5000)" class="bg-twitch-card hover:bg-gray-800 text-[10px] font-bold py-1 px-2 rounded-lg border border-twitch-border text-emerald-400">+5k</button>
             </div>
           `;
           simContainer.appendChild(div);
@@ -721,14 +728,21 @@
       }
     }
 
-    // OVERLAY RENDERER
+    // OVERLAY RENDERER (UTILIZADO TANTO NO ADMIN QUANTO NO OBS STANDALONE)
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
 
-      const visibilityClass = predictionState.isVisible ? 'widget-visible' : 'widget-hidden';
+      const visibilityClass = (predictionState.isVisible && predictionState.status !== 'IDLE') 
+        ? 'widget-visible' 
+        : 'widget-hidden';
+
       if (containerDual) containerDual.className = `w-full max-w-2xl widget-animated ${visibilityClass}`;
       if (containerStandalone) containerStandalone.className = `w-full max-w-3xl widget-animated ${visibilityClass}`;
+
+      if (!predictionState.options || predictionState.options.length === 0) {
+        return;
+      }
 
       const totalVotes = predictionState.options.reduce((acc, curr) => acc + curr.votes, 0);
       
@@ -750,11 +764,11 @@
       predictionState.options.forEach((opt) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(1) : (100 / predictionState.options.length).toFixed(1);
         progressBarSegments += `
-          <div style="width: ${pct}%" class="h-full ${opt.color.bg} transition-all duration-500 relative group"></div>
+          <div style="width: ${pct}%" class="h-full ${opt.color.bg} transition-all duration-500 relative"></div>
         `;
       });
 
-      // STATUS BADGE
+      // BADGES DE STATUS
       let statusBadge = '';
       if (predictionState.status === 'ACTIVE') {
         statusBadge = `
@@ -786,23 +800,39 @@
         `;
       }
 
-      // PAINEL DE RESULTADO DE GANHADORES E PERDEDORES
+      // PAINEL DE RESULTADO (TOP 3 + SCROLL VERTICAL CONTINUO ESTILO REDDIT)
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
-        let winnersListHTML = '';
-        if (winnerOption.topPredictors && winnerOption.topPredictors.length > 0) {
-          winnersListHTML = winnerOption.topPredictors.map(p => {
+        // ORDENA E RENDERIZA GANHADORES
+        const winnersArray = winnerOption.topPredictors || [];
+        const sortedWinners = [...winnersArray].sort((a, b) => (b.won || b.points) - (a.won || a.points));
+        
+        let winnersCardsHTML = '';
+        if (sortedWinners.length > 0) {
+          // Duplica os elementos se houver mais de 3 para garantir o scroll contínuo
+          const listToRender = sortedWinners.length > 3 ? [...sortedWinners, ...sortedWinners] : sortedWinners;
+          
+          winnersCardsHTML = listToRender.map((p, idx) => {
+            const originalIndex = (idx % sortedWinners.length) + 1;
             const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || (p.points * 2);
             const lucroLiquido = Math.max(0, totalGanhos - p.points);
 
+            let rankBadge = '';
+            if (originalIndex === 1) rankBadge = '<span class="bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded">1º</span>';
+            else if (originalIndex === 2) rankBadge = '<span class="bg-gray-300 text-black text-[9px] font-black px-1.5 py-0.2 rounded">2º</span>';
+            else if (originalIndex === 3) rankBadge = '<span class="bg-amber-700 text-white text-[9px] font-black px-1.5 py-0.2 rounded">3º</span>';
+
             return `
-              <div class="flex items-center justify-between text-xs bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg">
-                <div>
-                  <span class="font-bold text-white flex items-center gap-1">
-                    <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-400"></i> ${escapeHtml(p.name)}
-                  </span>
-                  <span class="text-[10px] text-gray-400">Apostou ${p.points.toLocaleString('pt-BR')} pts</span>
+              <div class="flex items-center justify-between text-xs bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg shrink-0">
+                <div class="flex items-center gap-1.5">
+                  ${rankBadge}
+                  <div>
+                    <span class="font-bold text-white flex items-center gap-1">
+                      ${escapeHtml(p.name)}
+                    </span>
+                    <span class="text-[9px] text-gray-400 block">Apostou ${p.points.toLocaleString('pt-BR')} pts</span>
+                  </div>
                 </div>
                 <div class="text-right">
                   <span class="font-extrabold text-emerald-400 block">+${totalGanhos.toLocaleString('pt-BR')} pts</span>
@@ -812,31 +842,49 @@
             `;
           }).join('');
         } else {
-          winnersListHTML = `<div class="text-[11px] text-gray-400 italic">Todos da opção "${escapeHtml(winnerOption.title)}" ganharam!</div>`;
+          winnersCardsHTML = `<div class="text-[11px] text-gray-400 italic p-2">Todos da opção "${escapeHtml(winnerOption.title)}" ganharam!</div>`;
         }
 
-        let losersListHTML = '';
-        const allLoserPredictors = loserOptions.flatMap(o => o.topPredictors || []);
-        if (allLoserPredictors.length > 0) {
-          losersListHTML = allLoserPredictors.map(p => `
-            <div class="flex items-center justify-between text-xs bg-red-950/40 border border-red-500/20 px-2.5 py-1.5 rounded-lg">
-              <div>
-                <span class="font-bold text-gray-300 flex items-center gap-1">
-                  <i data-lucide="user-x" class="w-3.5 h-3.5 text-red-400"></i> ${escapeHtml(p.name)}
-                </span>
-                <span class="text-[10px] text-gray-500">Apostou ${(p.points || p.lost || 0).toLocaleString('pt-BR')} pts</span>
+        // ORDENA E RENDERIZA PERDEDORES
+        const loserPredictors = loserOptions.flatMap(o => o.topPredictors || []);
+        const sortedLosers = [...loserPredictors].sort((a, b) => (b.points || b.lost) - (a.points || a.lost));
+
+        let losersCardsHTML = '';
+        if (sortedLosers.length > 0) {
+          const listToRender = sortedLosers.length > 3 ? [...sortedLosers, ...sortedLosers] : sortedLosers;
+
+          losersCardsHTML = listToRender.map((p, idx) => {
+            const originalIndex = (idx % sortedLosers.length) + 1;
+            const lostPts = p.points || p.lost || 0;
+
+            let rankBadge = '';
+            if (originalIndex === 1) rankBadge = '<span class="bg-red-500/30 text-red-300 text-[9px] font-black px-1.5 py-0.2 rounded">1º</span>';
+            else if (originalIndex === 2) rankBadge = '<span class="bg-red-500/20 text-red-300 text-[9px] font-black px-1.5 py-0.2 rounded">2º</span>';
+            else if (originalIndex === 3) rankBadge = '<span class="bg-red-500/20 text-red-300 text-[9px] font-black px-1.5 py-0.2 rounded">3º</span>';
+
+            return `
+              <div class="flex items-center justify-between text-xs bg-red-950/60 border border-red-500/30 px-2.5 py-1.5 rounded-lg shrink-0">
+                <div class="flex items-center gap-1.5">
+                  ${rankBadge}
+                  <div>
+                    <span class="font-bold text-gray-300 flex items-center gap-1">
+                      ${escapeHtml(p.name)}
+                    </span>
+                    <span class="text-[9px] text-gray-500 block">Apostou ${lostPts.toLocaleString('pt-BR')} pts</span>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="font-extrabold text-red-400">-${lostPts.toLocaleString('pt-BR')} pts</span>
+                </div>
               </div>
-              <div class="text-right">
-                <span class="font-extrabold text-red-400">-${(p.points || p.lost || 0).toLocaleString('pt-BR')} pts</span>
-              </div>
-            </div>
-          `).join('');
+            `;
+          }).join('');
         } else {
-          losersListHTML = `<div class="text-[11px] text-gray-400 italic">Os pontos da opção perdedora foram repassados.</div>`;
+          losersCardsHTML = `<div class="text-[11px] text-gray-400 italic p-2">Os pontos foram distribuídos para a opção vencedora.</div>`;
         }
 
         resultDetailsHTML = `
-          <div class="mb-5 p-4 rounded-xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/40 to-emerald-950/90 border border-emerald-500/40 shadow-lg shadow-emerald-950/50 animate-glow-winner space-y-3">
+          <div class="mb-5 p-4 rounded-xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/40 to-emerald-950/90 border border-emerald-500/40 shadow-lg animate-glow-winner space-y-3">
             
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2">
               <div class="flex items-center gap-2">
@@ -855,21 +903,33 @@
               </div>
             </div>
 
-            <!-- GANHADORES & PERDEDORES -->
+            <!-- GRADE COM SCROLL VERTICAL CONTÍNUO DOS GANHADORES E PERDEDORES -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              
+              <!-- GANHADORES -->
               <div class="space-y-1.5">
                 <div class="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
                   <i data-lucide="trophy" class="w-3 h-3"></i> Top Ganhadores (+${loserVotes.toLocaleString('pt-BR')} pts divididos)
                 </div>
-                <div class="space-y-1">${winnersListHTML}</div>
+                <div class="scroll-container rounded-lg bg-black/40 p-1">
+                  <div class="scroll-content ${sortedWinners.length <= 3 ? '[animation:none]' : ''}">
+                    ${winnersCardsHTML}
+                  </div>
+                </div>
               </div>
 
+              <!-- PERDEDORES -->
               <div class="space-y-1.5">
                 <div class="text-[10px] font-black uppercase tracking-wider text-red-400 flex items-center gap-1">
                   <i data-lucide="trending-down" class="w-3 h-3"></i> Top Perdedores (${loserVotes.toLocaleString('pt-BR')} pts perdidos)
                 </div>
-                <div class="space-y-1">${losersListHTML}</div>
+                <div class="scroll-container rounded-lg bg-black/40 p-1">
+                  <div class="scroll-content ${sortedLosers.length <= 3 ? '[animation:none]' : ''}">
+                    ${losersCardsHTML}
+                  </div>
+                </div>
               </div>
+
             </div>
 
           </div>
@@ -884,7 +944,7 @@
         const isWinner = predictionState.winningOptionId === opt.id;
         const isResolved = predictionState.status === 'RESOLVED';
 
-        const displayIndex = idx + 1; // 1, 2, 3...
+        const displayIndex = idx + 1;
 
         let cardStyle = "glass-card border-white/10";
         let badgeResult = "";
