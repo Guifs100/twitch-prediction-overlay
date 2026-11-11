@@ -65,7 +65,7 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /* ANIMAÇÃO ESTÁVEL DE VISIBILIDADE */
+    /* ANIMAÇÃO ESTÁVEL DE VISIBILIDADE DA STATE MACHINE */
     .widget-animated {
       transition: opacity 0.4s ease-out, transform 0.4s ease-out;
     }
@@ -78,11 +78,26 @@
       opacity: 1 !important;
       transform: translateY(0) scale(1);
     }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0e0e10;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3a3a44;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9146FF;
+    }
   </style>
 </head>
 <body class="bg-[#09090b] text-gray-100 font-sans min-h-screen selection:bg-twitch-purple selection:text-white">
 
-  <!-- CABEÇALHO -->
+  <!-- CABEÇALHO SUPERIOR -->
   <header id="app-header" class="bg-twitch-dark border-b border-twitch-border p-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
     <div class="flex items-center gap-3">
       <div class="bg-twitch-purple p-2 rounded-xl text-white shadow-lg shadow-twitch-purple/30">
@@ -97,6 +112,7 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <!-- Status da Conexão WebSocket -->
       <div id="connection-status" class="flex items-center gap-1.5 bg-[#0e0e10] border border-twitch-border px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-400">
         <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse" id="status-dot"></span>
         <span id="status-text">Conectando à Twitch...</span>
@@ -372,7 +388,6 @@
           topPredictors: []
         }));
 
-        // SINCRONIZAÇÃO DE TEMPO REAL PELA API DA TWITCH
         let remainingSecs = 120;
         if (event.locks_at) {
           const lockTime = new Date(event.locks_at).getTime();
@@ -422,18 +437,29 @@
         });
       }
 
-      // 3. FIM DO PALPITE NA TWITCH (RESULTADO)
+      // 3. FIM DO PALPITE NA TWITCH (RESULTADO OU CANCELAMENTO)
       if (type === 'channel.prediction.end') {
         clearTimeout(autoHideTimeout);
         
         const winningId = event.winning_outcome_id;
-        const status = event.status === 'RESOLVED' ? 'RESOLVED' : 'CANCELLED';
 
-        const winnerOpt = predictionState.options.find(o => o.twitchId === winningId || o.id === winningId);
-        const resolvedWinnerId = winnerOpt ? winnerOpt.id : winningId;
+        // Trata "RESOLVED", "CANCELED" ou a presença direta de um winning_outcome_id
+        const rawStatus = String(event.status || '').toUpperCase();
+        const isResolved = rawStatus === 'RESOLVED' || Boolean(winningId);
+        const status = isResolved ? 'RESOLVED' : 'CANCELLED';
+
+        // Localiza a opção vencedora por UUID ou ID sequencial ("1", "2"...)
+        const winnerOpt = predictionState.options.find(o => 
+          (o.twitchId && o.twitchId === winningId) || o.id === String(winningId)
+        );
+        
+        const resolvedWinnerId = winnerOpt ? winnerOpt.id : (winningId ? String(winningId) : null);
 
         const updatedOptions = predictionState.options.map((opt, idx) => {
-          const twitchOutcome = event.outcomes ? event.outcomes.find(o => o.id === opt.twitchId || String(idx + 1) === opt.id) : null;
+          const twitchOutcome = event.outcomes 
+            ? event.outcomes.find(o => o.id === opt.twitchId || String(idx + 1) === opt.id) 
+            : null;
+            
           const isWinnerOpt = opt.id === resolvedWinnerId || opt.twitchId === winningId;
           
           let predictors = [];
@@ -448,7 +474,7 @@
           return { ...opt, topPredictors: predictors };
         });
 
-        // REAPARECE COM O RESULTADO FINAL
+        // Força o overlay a reaparecer e exibir o painel de ganhadores
         updateState({
           status: status,
           winningOptionId: resolvedWinnerId,
@@ -458,10 +484,12 @@
 
         if (status === 'RESOLVED') {
           try { confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }); } catch(e){}
-          showToast("Palpite Encerrado na Twitch!");
+          showToast("Palpite Encerrado com Sucesso!");
+        } else {
+          showToast("Palpite Cancelado na Twitch.");
         }
 
-        // ESCONDE O OVERLAY APÓS 15s EXIBINDO O RESULTADO
+        // Esconde o overlay suavemente após 15 segundos
         scheduleAutoHide(15000);
       }
     }
@@ -508,7 +536,7 @@
             predictionState.remainingTime = 0;
             predictionState.status = 'LOCKED';
             clearInterval(timerInterval);
-            showToast("Votações enceradas! Escondendo em 15s...");
+            showToast("Votações encerradas! Escondendo em 15s...");
             updateState(predictionState);
             scheduleAutoHide(15000);
           }
