@@ -116,9 +116,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 1080p Safe</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 Sync & Auto-Hide 15s</span>
         </h1>
-        <p class="text-xs text-gray-400">Layout centralizado, fontes ampliadas para mobile/1080p e dados reais da Twitch</p>
+        <p class="text-xs text-gray-400">Timer sincronizado com a Twitch + Ping-Pong com velocidade fixa e Auto-Hide pós-scroll</p>
       </div>
     </div>
 
@@ -234,7 +234,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS / 1080p Central)
             </span>
-            <span class="text-xs text-amber-400 font-semibold">Auto-Hide & Reset em 15s ao encerrar</span>
+            <span class="text-xs text-amber-400 font-semibold">Auto-Hide 15s após término do scroll</span>
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
@@ -309,10 +309,16 @@
       lucide.createIcons();
     };
 
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
     function resetStateMachine(newStatus = 'IDLE') {
-      clearInterval(timerInterval);
+      stopTimer();
       clearTimeout(autoHideTimeout);
-      timerInterval = null;
       autoHideTimeout = null;
 
       predictionState.status = newStatus;
@@ -323,7 +329,7 @@
     function scheduleAutoHide(delayMs = 15000) {
       clearTimeout(autoHideTimeout);
       autoHideTimeout = setTimeout(() => {
-        updateState({ isVisible: false, status: 'IDLE', winningOptionId: null });
+        updateState({ isVisible: false, status: 'IDLE', winningOptionId: null, remainingTime: 0 });
       }, delayMs);
     }
 
@@ -345,6 +351,7 @@
 
           await subscribeToEvent(sessionId, 'channel.prediction.begin');
           await subscribeToEvent(sessionId, 'channel.prediction.progress');
+          await subscribeToEvent(sessionId, 'channel.prediction.lock');
           await subscribeToEvent(sessionId, 'channel.prediction.end');
         }
 
@@ -382,7 +389,6 @@
       }
     }
 
-    // Leitura correta e robusta dos dados do EventSub da Twitch
     function handleTwitchPredictionNotification(type, event) {
       if (type === 'channel.prediction.begin') {
         resetStateMachine('ACTIVE');
@@ -433,7 +439,7 @@
         }));
 
         let remainingSecs = predictionState.remainingTime;
-        if (event.locks_at) {
+        if (event.locks_at && predictionState.status === 'ACTIVE') {
           const lockTime = new Date(event.locks_at).getTime();
           remainingSecs = Math.max(0, Math.floor((lockTime - Date.now()) / 1000));
         }
@@ -446,7 +452,20 @@
         });
       }
 
+      // VOTAÇÃO ENCERRADA/TRANCADA NA TWITCH
+      if (type === 'channel.prediction.lock') {
+        stopTimer();
+        updateState({
+          status: 'LOCKED',
+          remainingTime: 0,
+          isVisible: true
+        });
+        showToast("Votações encerradas!");
+      }
+
+      // RESULTADO DEFINIDO NA TWITCH
       if (type === 'channel.prediction.end') {
+        stopTimer();
         clearTimeout(autoHideTimeout);
         
         const winningId = event.winning_outcome_id;
@@ -486,6 +505,7 @@
 
         updateState({
           status: status,
+          remainingTime: 0,
           winningOptionId: resolvedWinnerId,
           options: updatedOptions,
           isVisible: true
@@ -495,8 +515,6 @@
           try { confetti({ particleCount: 140, spread: 90, origin: { y: 0.6 } }); } catch(e){}
           showToast("Palpite Encerrado!");
         }
-
-        scheduleAutoHide(15000);
       }
     }
 
@@ -523,7 +541,7 @@
     }
 
     function startTimerIfNeeded() {
-      clearInterval(timerInterval);
+      stopTimer();
       if (predictionState.status === 'ACTIVE' && predictionState.remainingTime > 0) {
         timerInterval = setInterval(() => {
           if (predictionState.remainingTime > 1) {
@@ -534,10 +552,9 @@
           } else {
             predictionState.remainingTime = 0;
             predictionState.status = 'LOCKED';
-            clearInterval(timerInterval);
+            stopTimer();
             showToast("Votações encerradas!");
             updateState(predictionState);
-            scheduleAutoHide(15000);
           }
         }, 1000);
       }
@@ -633,10 +650,9 @@
 
     function lockPrediction() {
       if (predictionState.status === 'ACTIVE') {
-        clearInterval(timerInterval);
+        stopTimer();
         updateState({ status: 'LOCKED', remainingTime: 0, isVisible: true });
         showToast("Votações trancadas!");
-        scheduleAutoHide(15000);
       }
     }
 
@@ -689,6 +705,7 @@
     }
 
     function resolvePrediction(winnerId) {
+      stopTimer();
       clearTimeout(autoHideTimeout);
       
       const updatedOptions = predictionState.options.map(opt => {
@@ -703,7 +720,9 @@
               { name: 'Guifs', points: 5000, won: 12500 },
               { name: 'Mount', points: 4000, won: 10000 },
               { name: 'Cellbit', points: 3500, won: 8750 },
-              { name: 'Rayan', points: 3000, won: 7500 }
+              { name: 'Rayan', points: 3000, won: 7500 },
+              { name: 'Smitt', points: 2500, won: 6250 },
+              { name: 'Xandig', points: 2000, won: 5000 }
             ]
           };
         } else {
@@ -723,10 +742,9 @@
         }
       });
 
-      updateState({ status: 'RESOLVED', winningOptionId: winnerId, options: updatedOptions, isVisible: true });
+      updateState({ status: 'RESOLVED', remainingTime: 0, winningOptionId: winnerId, options: updatedOptions, isVisible: true });
       try { confetti({ particleCount: 140, spread: 90, origin: { y: 0.6 } }); } catch(err){}
       showToast("Palpite Encerrado!");
-      scheduleAutoHide(15000);
     }
 
     function simulateHeavyResult() {
@@ -799,7 +817,7 @@
       }
     }
 
-    // RENDERIZADOR DO OVERLAY COM FONTES MAIORES E ESCALA MELHORADA PARA 1080P
+    // RENDERIZADOR DO OVERLAY
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -840,7 +858,7 @@
         `;
       });
 
-      // BADGES DE STATUS
+      // BADGES DE STATUS (CRONÔMETRO INTERROMPIDO NO LOCK / RESOLVE)
       let statusBadge = '';
       if (predictionState.status === 'ACTIVE') {
         statusBadge = `
@@ -872,7 +890,7 @@
         `;
       }
 
-      // PAINEL DE RESULTADOS COM PONTUAÇÕES REAIS E FONTES AMPLIADAS
+      // PAINEL DE RESULTADOS COM PONTUAÇÕES REAIS DA TWITCH
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
@@ -1159,45 +1177,64 @@
       lucide.createIcons();
     }
 
-    // MOTOR DE ROLAGEM PING-PONG (VAI E VOLTA EM 12 SEGUNDOS)
+    // MOTOR DE ROLAGEM PING-PONG COM VELOCIDADE FIXA E AUTO-HIDE APÓS 15s DA IDA E VOLTA COMPLETA
     function initPingPongScroll() {
       setTimeout(() => {
         const containers = document.querySelectorAll('[data-pingpong]');
+        if (containers.length === 0) return;
+
+        let longestContainer = null;
+        let maxScrollDistance = 0;
+
         containers.forEach(container => {
           const track = container.querySelector('.auto-scroll-track');
           if (!track) return;
 
-          const maxScroll = track.scrollWidth - container.clientWidth;
-          if (maxScroll <= 0) return;
+          const dist = track.scrollWidth - container.clientWidth;
+          if (dist > maxScrollDistance) {
+            maxScrollDistance = dist;
+            longestContainer = container;
+          }
+
+          if (dist <= 0) return; // Não precisa rolar se couber tudo na tela
 
           let pos = 0;
           let direction = 1; 
-          const totalDistance = maxScroll * 2; 
-          const totalFrames = 12 * 60; 
-          const speed = totalDistance / totalFrames;
+          const fixedSpeed = 0.8; // Velocidade fixa ideal para leitura no OBS (pixels por frame)
 
           function step() {
-            pos += speed * direction;
+            pos += fixedSpeed * direction;
 
-            if (pos >= maxScroll) {
-              pos = maxScroll;
-              direction = -1; 
+            if (pos >= dist) {
+              pos = dist;
+              direction = -1; // Inverte sentido quando chega no fim
             } else if (pos <= 0) {
               pos = 0;
-              direction = 1; 
+              direction = 1; // Inverte sentido quando volta ao início
+              
+              // Dispara callback de conclusão quando fecha a primeira ida e volta completa
+              if (container._hasCompletedCycle === false && container === longestContainer) {
+                container._hasCompletedCycle = true;
+                if (predictionState.status === 'RESOLVED' || predictionState.status === 'CANCELLED') {
+                  scheduleAutoHide(15000);
+                }
+              }
             }
 
             track.style.transform = `translateX(-${pos}px)`;
             container._animId = requestAnimationFrame(step);
           }
 
+          container._hasCompletedCycle = false;
           if (container._animId) cancelAnimationFrame(container._animId);
           container._animId = requestAnimationFrame(step);
-
-          container.onmouseenter = () => cancelAnimationFrame(container._animId);
-          container.onmouseleave = () => { container._animId = requestAnimationFrame(step); };
         });
-      }, 150);
+
+        // Caso a lista de apostadores seja pequena e caiba toda sem scroll, inicia a contagem de 15s direto
+        if (maxScrollDistance <= 0 && (predictionState.status === 'RESOLVED' || predictionState.status === 'CANCELLED')) {
+          scheduleAutoHide(15000);
+        }
+      }, 200);
     }
 
     function toggleViewMode() {
