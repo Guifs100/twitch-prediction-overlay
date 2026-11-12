@@ -116,9 +116,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 Sync & Auto-Hide 15s</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 Ping-Pong 2s Delay</span>
         </h1>
-        <p class="text-xs text-gray-400">Timer sincronizado com a Twitch + Ping-Pong com velocidade fixa e Auto-Hide pós-scroll</p>
+        <p class="text-xs text-gray-400">Rolagem Ping-Pong com pausa de 2s nos extremos e Auto-Hide pós-ciclo</p>
       </div>
     </div>
 
@@ -234,7 +234,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS / 1080p Central)
             </span>
-            <span class="text-xs text-amber-400 font-semibold">Auto-Hide 15s após término do scroll</span>
+            <span class="text-xs text-amber-400 font-semibold">Auto-Hide 15s após término do ciclo com pausas de 2s</span>
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
@@ -452,7 +452,6 @@
         });
       }
 
-      // VOTAÇÃO ENCERRADA/TRANCADA NA TWITCH
       if (type === 'channel.prediction.lock') {
         stopTimer();
         updateState({
@@ -463,7 +462,6 @@
         showToast("Votações encerradas!");
       }
 
-      // RESULTADO DEFINIDO NA TWITCH
       if (type === 'channel.prediction.end') {
         stopTimer();
         clearTimeout(autoHideTimeout);
@@ -858,7 +856,7 @@
         `;
       });
 
-      // BADGES DE STATUS (CRONÔMETRO INTERROMPIDO NO LOCK / RESOLVE)
+      // BADGES DE STATUS
       let statusBadge = '';
       if (predictionState.status === 'ACTIVE') {
         statusBadge = `
@@ -1177,7 +1175,7 @@
       lucide.createIcons();
     }
 
-    // MOTOR DE ROLAGEM PING-PONG COM VELOCIDADE FIXA E AUTO-HIDE APÓS 15s DA IDA E VOLTA COMPLETA
+    // MOTOR PING-PONG COM PAUSA DE 2 SEGUNDOS NOS EXTREMOS
     function initPingPongScroll() {
       setTimeout(() => {
         const containers = document.querySelectorAll('[data-pingpong]');
@@ -1196,29 +1194,50 @@
             longestContainer = container;
           }
 
-          if (dist <= 0) return; // Não precisa rolar se couber tudo na tela
+          if (dist <= 0) return;
 
           let pos = 0;
           let direction = 1; 
-          const fixedSpeed = 0.8; // Velocidade fixa ideal para leitura no OBS (pixels por frame)
+          const fixedSpeed = 0.8; 
+          let isWaiting = false;
 
           function step() {
+            if (isWaiting) return;
+
             pos += fixedSpeed * direction;
 
             if (pos >= dist) {
               pos = dist;
-              direction = -1; // Inverte sentido quando chega no fim
+              direction = -1; // Inverte para voltar
+              isWaiting = true;
+              track.style.transform = `translateX(-${pos}px)`;
+              
+              // Pausa de 2s no final do percurso
+              setTimeout(() => {
+                isWaiting = false;
+                container._animId = requestAnimationFrame(step);
+              }, 2000);
+              return;
             } else if (pos <= 0) {
               pos = 0;
-              direction = 1; // Inverte sentido quando volta ao início
-              
-              // Dispara callback de conclusão quando fecha a primeira ida e volta completa
+              direction = 1; // Inverte para ir novamente
+              isWaiting = true;
+              track.style.transform = `translateX(-${pos}px)`;
+
+              // Se concluiu a ida e a volta completa
               if (container._hasCompletedCycle === false && container === longestContainer) {
                 container._hasCompletedCycle = true;
                 if (predictionState.status === 'RESOLVED' || predictionState.status === 'CANCELLED') {
                   scheduleAutoHide(15000);
                 }
               }
+
+              // Pausa de 2s no início do percurso
+              setTimeout(() => {
+                isWaiting = false;
+                container._animId = requestAnimationFrame(step);
+              }, 2000);
+              return;
             }
 
             track.style.transform = `translateX(-${pos}px)`;
@@ -1230,7 +1249,6 @@
           container._animId = requestAnimationFrame(step);
         });
 
-        // Caso a lista de apostadores seja pequena e caiba toda sem scroll, inicia a contagem de 15s direto
         if (maxScrollDistance <= 0 && (predictionState.status === 'RESOLVED' || predictionState.status === 'CANCELLED')) {
           scheduleAutoHide(15000);
         }
