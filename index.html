@@ -121,7 +121,7 @@
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
           Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 Expanded & Safe Padding</span>
         </h1>
-        <p class="text-xs text-gray-400">Layout ampliado (1040px), fontes maiores e fim de lista sem cortes</p>
+        <p class="text-xs text-gray-400">Layout ampliado (1040px), fontes maiores, Auto-Hide ao trancar votos e fim de lista sem cortes</p>
       </div>
     </div>
 
@@ -237,7 +237,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS / 1040px Expanded)
             </span>
-            <span class="text-xs text-amber-400 font-semibold">Auto-Hide 15s após término do ciclo com pausas de 2s</span>
+            <span class="text-xs text-amber-400 font-semibold">Auto-Hide em 15s após zerar o tempo ou encerrar</span>
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
@@ -463,6 +463,8 @@
           isVisible: true
         });
         showToast("Votações encerradas!");
+        // Agenda o desaparecimento após 15s caso o streamer demore para escolher o resultado
+        scheduleAutoHide(15000);
       }
 
       if (type === 'channel.prediction.end') {
@@ -556,6 +558,8 @@
             stopTimer();
             showToast("Votações encerradas!");
             updateState(predictionState);
+            // Inicia contagem de 15s para esconder o widget após o tempo acabar naturalmente
+            scheduleAutoHide(15000);
           }
         }, 1000);
       }
@@ -654,6 +658,7 @@
         stopTimer();
         updateState({ status: 'LOCKED', remainingTime: 0, isVisible: true });
         showToast("Votações trancadas!");
+        scheduleAutoHide(15000);
       }
     }
 
@@ -1192,7 +1197,6 @@
           const track = container.querySelector('.auto-scroll-track');
           if (!track) return;
 
-          // Adiciona folga de margem positiva para que o último elemento fique 100% visível
           const dist = (track.scrollWidth - container.clientWidth) + 16;
           if (dist > maxScrollDistance) {
             maxScrollDistance = dist;
