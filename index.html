@@ -48,16 +48,8 @@
   </script>
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-    }
-
     body.overlay-only {
       background: transparent !important;
-      overflow: hidden !important;
     }
 
     body.overlay-only #toast {
@@ -90,7 +82,7 @@
       transform: translateY(0) scale(1);
     }
 
-    /* Largura garantida mesmo no navegador embutido do OBS */
+    /* Otimizado com largura ampliada para evitar texto apertado */
     .overlay-box-fixed {
       width: 100%;
       max-width: 1040px;
@@ -107,6 +99,7 @@
       align-items: center;
     }
     
+    /* Padding extra à direita para garantir que o último nome não fique cortado */
     .auto-scroll-track {
       display: flex;
       gap: 0.6rem;
@@ -118,12 +111,6 @@
 </head>
 <body class="bg-[#09090b] text-gray-100 font-sans min-h-screen selection:bg-twitch-purple selection:text-white">
 
-  <!-- ALERTA DE DIAGNÓSTICO EXCLUSIVO PARA OBS (SÓ APARECE SE DER ERRO DE CONEXÃO) -->
-  <div id="obs-error-banner" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-950/95 border-2 border-red-500 text-white px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold">
-    <span class="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
-    <span id="obs-error-text">Erro de conexão com a Twitch</span>
-  </div>
-
   <!-- CABEÇALHO ADMIN -->
   <header id="app-header" class="bg-twitch-dark border-b border-twitch-border p-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
     <div class="flex items-center gap-3">
@@ -132,9 +119,9 @@
       </div>
       <div>
         <h1 class="font-display text-xl font-extrabold tracking-wider text-white uppercase flex items-center gap-2">
-          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 OBS Fixed</span>
+          Overlay de Palpites <span class="bg-twitch-purple/20 text-twitch-purple text-xs px-2 py-0.5 rounded-full border border-twitch-purple/40 font-sans">v0.8 Expanded & Safe Padding</span>
         </h1>
-        <p class="text-xs text-gray-400">Compatibilidade reforçada com Browser Source do OBS Studio</p>
+        <p class="text-xs text-gray-400">Layout ampliado (1040px), fontes maiores e fim de lista sem cortes</p>
       </div>
     </div>
 
@@ -157,8 +144,8 @@
   </header>
 
   <!-- CONTAINER PRINCIPAL -->
-  <main id="main-container" class="w-full">
-    <div id="dual-view" class="p-4 md:p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <main id="main-container" class="p-4 md:p-6 max-w-7xl mx-auto">
+    <div id="dual-view" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
       <!-- CONTROLES LOCAIS -->
       <section class="lg:col-span-5 space-y-6">
@@ -250,7 +237,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Visualização Prévia do Overlay (OBS / 1040px Expanded)
             </span>
-            <span class="text-xs text-amber-400 font-semibold">Auto-Hide em 15s após zerar o tempo ou encerrar</span>
+            <span class="text-xs text-amber-400 font-semibold">Auto-Hide 15s após término do ciclo com pausas de 2s</span>
           </div>
 
           <div class="flex-1 min-h-[500px] bg-[#050508] border border-dashed border-twitch-border rounded-xl p-4 md:p-8 flex items-center justify-center relative overflow-hidden">
@@ -262,7 +249,7 @@
     </div>
 
     <!-- MODO OVERLAY EXCLUSIVO OBS (STANDALONE) -->
-    <div id="overlay-only-view" class="hidden w-screen h-screen flex items-center justify-center p-6 box-border">
+    <div id="overlay-only-view" class="hidden min-h-screen flex items-center justify-center p-4">
       <div id="overlay-standalone-container" class="w-full overlay-box-fixed widget-animated widget-hidden"></div>
     </div>
   </main>
@@ -273,8 +260,9 @@
   </div>
 
   <script>
-    // URL absoluta da Vercel para funcionar independente de onde o OBS abrir o arquivo
-    const VERCEL_API_URL = 'https://twitch-prediction-overlay-steel.vercel.app/api/subscribe';
+    const VERCEL_API_URL = window.location.origin.includes('localhost') 
+      ? '/api/subscribe' 
+      : 'https://twitch-prediction-overlay-steel.vercel.app/api/subscribe';
 
     const OPTION_COLORS = [
       { name: 'Azul Twitch', hex: '#3894FE', bg: 'bg-[#3894FE]', text: 'text-[#3894FE]', border: 'border-[#3894FE]' },
@@ -302,7 +290,6 @@
     let timerInterval = null;
     let autoHideTimeout = null;
     let twitchSocket = null;
-    let reconnectTimeout = null;
     const broadcastChannel = new BroadcastChannel('twitch_prediction_channel');
 
     window.onload = function() {
@@ -314,7 +301,6 @@
       renderOptionInputs(['Sim', 'Não']);
       renderApp();
 
-      // Sincronização entre abas no mesmo navegador
       broadcastChannel.onmessage = (event) => {
         if (event.data) {
           predictionState = event.data;
@@ -322,34 +308,9 @@
         }
       };
 
-      window.addEventListener('storage', (event) => {
-        if (event.key === 'twitch_prediction_data' && event.newValue) {
-          try {
-            predictionState = JSON.parse(event.newValue);
-            renderApp();
-          } catch (e) {}
-        }
-      });
-
       connectTwitchEventSub();
-      if (window.lucide) lucide.createIcons();
+      lucide.createIcons();
     };
-
-    function showObsDiagnostic(msg) {
-      const banner = document.getElementById('obs-error-banner');
-      const textEl = document.getElementById('obs-error-text');
-      if (banner && textEl && document.body.classList.contains('overlay-only')) {
-        textEl.innerText = msg;
-        banner.classList.remove('hidden');
-      }
-    }
-
-    function hideObsDiagnostic() {
-      const banner = document.getElementById('obs-error-banner');
-      if (banner) {
-        banner.classList.add('hidden');
-      }
-    }
 
     function stopTimer() {
       if (timerInterval) {
@@ -376,11 +337,6 @@
     }
 
     function connectTwitchEventSub() {
-      clearTimeout(reconnectTimeout);
-      if (twitchSocket) {
-        try { twitchSocket.close(); } catch (e) {}
-      }
-
       updateConnectionStatus('connecting', 'Conectando à Twitch...');
       twitchSocket = new WebSocket('wss://eventsub.wss.twitch.tv/ws');
 
@@ -396,30 +352,10 @@
           const sessionId = response.payload.session.id;
           updateConnectionStatus('connected', 'Conectado à Twitch');
 
-          const events = [
-            'channel.prediction.begin',
-            'channel.prediction.progress',
-            'channel.prediction.lock',
-            'channel.prediction.end'
-          ];
-
-          let allOk = true;
-          for (const ev of events) {
-            const ok = await subscribeToEvent(sessionId, ev);
-            if (!ok) allOk = false;
-          }
-
-          if (allOk) {
-            hideObsDiagnostic();
-          }
-        }
-
-        if (messageType === 'session_reconnect') {
-          const reconnectUrl = response.payload.session.reconnect_url;
-          if (reconnectUrl) {
-            console.log('🔄 Twitch solicitou reconexão...');
-            twitchSocket.close();
-          }
+          await subscribeToEvent(sessionId, 'channel.prediction.begin');
+          await subscribeToEvent(sessionId, 'channel.prediction.progress');
+          await subscribeToEvent(sessionId, 'channel.prediction.lock');
+          await subscribeToEvent(sessionId, 'channel.prediction.end');
         }
 
         if (messageType === 'notification') {
@@ -432,12 +368,11 @@
       twitchSocket.onerror = (err) => {
         console.error('❌ Erro WebSocket:', err);
         updateConnectionStatus('error', 'Erro na Conexão');
-        showObsDiagnostic('Erro no WebSocket da Twitch. Tentando reconectar...');
       };
 
       twitchSocket.onclose = () => {
         updateConnectionStatus('connecting', 'Reconectando em 5s...');
-        reconnectTimeout = setTimeout(connectTwitchEventSub, 5000);
+        setTimeout(connectTwitchEventSub, 5000);
       };
     }
 
@@ -451,26 +386,17 @@
         const data = await res.json();
         if (res.ok) {
           console.log(`📡 Inscrito no evento: ${eventType}`);
-          return true;
-        } else {
-          console.error(`⚠️ Falha ao inscrever em ${eventType}:`, data);
-          showObsDiagnostic(`Erro API (${eventType}): ${data.error || res.status}`);
-          return false;
         }
       } catch (error) {
         console.error('❌ Erro de conexão com Vercel:', error);
-        showObsDiagnostic('Sem resposta da API Vercel (/api/subscribe)');
-        return false;
       }
     }
 
     function handleTwitchPredictionNotification(type, event) {
-      console.log('📩 Evento recebido:', type, event);
-
       if (type === 'channel.prediction.begin') {
         resetStateMachine('ACTIVE');
 
-        const mappedOptions = (event.outcomes || []).map((o, idx) => ({
+        const mappedOptions = event.outcomes.map((o, idx) => ({
           id: String(idx + 1),
           twitchId: o.id || '',
           title: o.title,
@@ -501,7 +427,7 @@
       }
 
       if (type === 'channel.prediction.progress') {
-        const mappedOptions = (event.outcomes || []).map((o, idx) => ({
+        const mappedOptions = event.outcomes.map((o, idx) => ({
           id: String(idx + 1),
           twitchId: o.id || '',
           title: o.title,
@@ -521,20 +447,12 @@
           remainingSecs = Math.max(0, Math.floor((lockTime - Date.now()) / 1000));
         }
 
-        // Garante que se o OBS perdeu o 'begin' por algum motivo, o 'progress' já abre o overlay na tela
-        const currentStatus = predictionState.status === 'IDLE' ? 'ACTIVE' : predictionState.status;
-
         updateState({
           title: event.title,
-          status: currentStatus,
           remainingTime: remainingSecs,
           isVisible: true,
           options: mappedOptions
         });
-
-        if (!timerInterval && currentStatus === 'ACTIVE' && remainingSecs > 0) {
-          startTimerIfNeeded();
-        }
       }
 
       if (type === 'channel.prediction.lock') {
@@ -545,7 +463,6 @@
           isVisible: true
         });
         showToast("Votações encerradas!");
-        scheduleAutoHide(15000);
       }
 
       if (type === 'channel.prediction.end') {
@@ -557,27 +474,13 @@
         const isResolved = rawStatus === 'RESOLVED' || Boolean(winningId);
         const status = isResolved ? 'RESOLVED' : 'CANCELLED';
 
-        // Se o OBS abriu no meio e não tinha opções salvas, reconstrói pelo evento end
-        let baseOptions = predictionState.options;
-        if (!baseOptions || baseOptions.length === 0) {
-          baseOptions = (event.outcomes || []).map((o, idx) => ({
-            id: String(idx + 1),
-            twitchId: o.id || '',
-            title: o.title,
-            votes: o.channel_points || 0,
-            usersCount: o.users || 0,
-            color: OPTION_COLORS[idx % OPTION_COLORS.length],
-            topPredictors: []
-          }));
-        }
-
-        const winnerOpt = baseOptions.find(o => 
+        const winnerOpt = predictionState.options.find(o => 
           (o.twitchId && o.twitchId === winningId) || o.id === String(winningId)
         );
         
         const resolvedWinnerId = winnerOpt ? winnerOpt.id : (winningId ? String(winningId) : null);
 
-        const updatedOptions = baseOptions.map((opt, idx) => {
+        const updatedOptions = predictionState.options.map((opt, idx) => {
           const twitchOutcome = event.outcomes 
             ? event.outcomes.find(o => o.id === opt.twitchId || String(idx + 1) === opt.id) 
             : null;
@@ -602,7 +505,6 @@
         });
 
         updateState({
-          title: event.title || predictionState.title,
           status: status,
           remainingTime: 0,
           winningOptionId: resolvedWinnerId,
@@ -634,10 +536,8 @@
 
     function updateState(newState) {
       predictionState = { ...predictionState, ...newState };
-      try {
-        localStorage.setItem('twitch_prediction_data', JSON.stringify(predictionState));
-        broadcastChannel.postMessage(predictionState);
-      } catch (e) {}
+      localStorage.setItem('twitch_prediction_data', JSON.stringify(predictionState));
+      broadcastChannel.postMessage(predictionState);
       renderApp();
     }
 
@@ -647,10 +547,8 @@
         timerInterval = setInterval(() => {
           if (predictionState.remainingTime > 1) {
             predictionState.remainingTime -= 1;
-            try {
-              localStorage.setItem('twitch_prediction_data', JSON.stringify(predictionState));
-              broadcastChannel.postMessage(predictionState);
-            } catch (e) {}
+            localStorage.setItem('twitch_prediction_data', JSON.stringify(predictionState));
+            broadcastChannel.postMessage(predictionState);
             renderOverlayWidget();
           } else {
             predictionState.remainingTime = 0;
@@ -658,7 +556,6 @@
             stopTimer();
             showToast("Votações encerradas!");
             updateState(predictionState);
-            scheduleAutoHide(15000);
           }
         }, 1000);
       }
@@ -666,7 +563,6 @@
 
     function renderOptionInputs(initialValues = ['Sim', 'Não']) {
       const container = document.getElementById('options-input-container');
-      if (!container) return;
       container.innerHTML = '';
       
       initialValues.forEach((val, idx) => {
@@ -685,7 +581,7 @@
         `;
         container.appendChild(div);
       });
-      if (window.lucide) lucide.createIcons();
+      lucide.createIcons();
     }
 
     function presetOptions(count) {
@@ -758,7 +654,6 @@
         stopTimer();
         updateState({ status: 'LOCKED', remainingTime: 0, isVisible: true });
         showToast("Votações trancadas!");
-        scheduleAutoHide(15000);
       }
     }
 
@@ -916,7 +811,7 @@
           `;
           resolveContainer.appendChild(btn);
         });
-        if (window.lucide) lucide.createIcons();
+        lucide.createIcons();
       }
 
       const btnLock = document.getElementById('btn-lock');
@@ -925,6 +820,7 @@
       }
     }
 
+    // RENDERIZADOR DO OVERLAY COM ESPAÇAMENTOS E FONTES EXPANDIDAS
     function renderOverlayWidget() {
       const containerDual = document.getElementById('overlay-widget-container');
       const containerStandalone = document.getElementById('overlay-standalone-container');
@@ -956,6 +852,7 @@
       const returnRatio = (winnerVotes > 0) ? ((totalVotes / winnerVotes)).toFixed(2) : "1.00";
       const returnPer1k = Math.round(1000 * parseFloat(returnRatio));
 
+      // BARRAS MULTISEGMENTADAS
       let progressBarSegments = '';
       predictionState.options.forEach((opt) => {
         const pct = totalVotes > 0 ? ((opt.votes / totalVotes) * 100).toFixed(1) : (100 / predictionState.options.length).toFixed(1);
@@ -964,6 +861,7 @@
         `;
       });
 
+      // BADGES DE STATUS
       let statusBadge = '';
       if (predictionState.status === 'ACTIVE') {
         statusBadge = `
@@ -995,6 +893,7 @@
         `;
       }
 
+      // PAINEL DE RESULTADOS COM DADOS REAIS
       let resultDetailsHTML = '';
       if (predictionState.status === 'RESOLVED' && winnerOption) {
         
@@ -1121,8 +1020,10 @@
               </div>
             </div>
 
+            <!-- COLUNAS 100% SIMÉTRICAS E PROPORCIONAIS -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               
+              <!-- COLUNA ESQUERDA: TOP GANHADORES -->
               <div class="flex flex-col justify-between space-y-2 min-w-0 h-full">
                 <div>
                   <div class="text-xs md:text-sm font-black uppercase tracking-wider text-emerald-400 flex items-center justify-between whitespace-nowrap mb-1.5">
@@ -1138,6 +1039,7 @@
                 </div>
               </div>
 
+              <!-- COLUNA DIREITA: TOP PERDEDORES -->
               <div class="flex flex-col justify-between space-y-2 min-w-0 h-full">
                 <div>
                   <div class="text-xs md:text-sm font-black uppercase tracking-wider text-red-400 flex items-center justify-between whitespace-nowrap mb-1.5">
@@ -1274,9 +1176,10 @@
       if (containerDual) containerDual.innerHTML = widgetHTML;
       if (containerStandalone) containerStandalone.innerHTML = widgetHTML;
 
-      if (window.lucide) lucide.createIcons();
+      lucide.createIcons();
     }
 
+    // MOTOR PING-PONG COM PADDING DE SEGURANÇA E PAUSAS DE 2s
     function initPingPongScroll() {
       setTimeout(() => {
         const containers = document.querySelectorAll('[data-pingpong]');
@@ -1289,6 +1192,7 @@
           const track = container.querySelector('.auto-scroll-track');
           if (!track) return;
 
+          // Adiciona folga de margem positiva para que o último elemento fique 100% visível
           const dist = (track.scrollWidth - container.clientWidth) + 16;
           if (dist > maxScrollDistance) {
             maxScrollDistance = dist;
@@ -1309,10 +1213,11 @@
 
             if (pos >= dist) {
               pos = dist;
-              direction = -1;
+              direction = -1; // Inverte para voltar
               isWaiting = true;
               track.style.transform = `translateX(-${pos}px)`;
               
+              // Pausa de 2s no final do percurso
               setTimeout(() => {
                 isWaiting = false;
                 container._animId = requestAnimationFrame(step);
@@ -1320,10 +1225,11 @@
               return;
             } else if (pos <= 0) {
               pos = 0;
-              direction = 1;
+              direction = 1; // Inverte para ir novamente
               isWaiting = true;
               track.style.transform = `translateX(-${pos}px)`;
 
+              // Se concluiu a ida e a volta completa
               if (container._hasCompletedCycle === false && container === longestContainer) {
                 container._hasCompletedCycle = true;
                 if (predictionState.status === 'RESOLVED' || predictionState.status === 'CANCELLED') {
@@ -1331,6 +1237,7 @@
                 }
               }
 
+              // Pausa de 2s no início do percurso
               setTimeout(() => {
                 isWaiting = false;
                 container._animId = requestAnimationFrame(step);
