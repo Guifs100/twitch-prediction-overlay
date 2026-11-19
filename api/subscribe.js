@@ -1,151 +1,123 @@
-// api/subscribe.js
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-// Guarda o token renovado em memória temporária da instância Serverless
-let cachedAccessToken = process.env.TWITCH_OAUTH_TOKEN;
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-/**
- * Função para obter um Access Token válido da Twitch.
- * Se o token atual estiver expirado, utiliza o Refresh Token para obter um novo.
- */
-async function getValidAccessToken() {
+  const { sessionId, eventType, eventTypes } = req.body || {};
+  if (!sessionId) return res.status(400).json({ error: 'sessionId é obrigatório' });
+
+  const typesToSubscribe = Array.isArray(eventTypes) && eventTypes.length > 0
+    ? eventTypes
+    : eventType
+      ? [eventType]
+      : [
+          'channel.prediction.begin',
+          'channel.prediction.progress',
+          'channel.prediction.lock',
+          'channel.prediction.end'
+        ];
+
   const clientId = process.env.TWITCH_CLIENT_ID;
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-  const refreshToken = process.env.TWITCH_REFRESH_TOKEN;
-  let currentToken = cachedAccessToken || process.env.TWITCH_OAUTH_TOKEN;
+  const accessToken = process.env.TWITCH_ACCESS_TOKEN;
+  const broadcasterId = process.env.TWITCH_BROADCASTER_ID;
 
-  // Remove o prefixo "oauth:" se tiver sido adicionado por engano
-  if (currentToken && currentToken.startsWith('oauth:')) {
-    currentToken = currentToken.replace('oauth:', '');
+  if (!clientId || !accessToken || !broadcasterId) {
+    return res.status(500).json({
+      error: 'Variáveis TWITCH_CLIENT_ID, TWITCH_ACCESS_TOKEN ou TWITCH_BROADCASTER_ID ausentes.'
+    });
   }
 
-  // 1. Valida o token atual na API da Twitch
+  const twitchHeaders = {
+    'Client-ID': clientId,
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+
   try {
-    const validateRes = await fetch('https://id.twitch.tv/oauth2/validate', {
-      headers: {
-        'Authorization': `OAuth ${currentToken}`
-      }
+    const listRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+      method: 'GET',
+      headers: twitchHeaders
     });
 
-    if (validateRes.ok) {
-      cachedAccessToken = currentToken;
-      return currentToken;
+    if (listRes.status === 429) {
+      return res.status(429).json({ error: 'Rate limit da Twitch ao listar inscrições.' });
     }
-  } catch (err) {
-    console.warn('⚠️ Falha ao validar token atual da Twitch:', err.message);
-  }
 
-  // 2. Se o token expirou ou falhou, e temos o Refresh Token + Secret, tenta renovar
-  if (refreshToken && clientSecret && clientId) {
-    console.log('🔄 Token expirado. A tentar renovar via Refresh Token...');
+    const listData = await listRes.json();
+    const existingSubs = listData.data || [];
 
-    try {
-      const refreshRes = await fetch('https://id.twitch.tv/oauth2/token', {
+    // Remove inscrições antigas dos mesmos eventos de outras sessões WebSocket
+    const subsToDelete = existingSubs.filter(sub =>
+      typesToSubscribe.includes(sub.type) &&
+      sub.transport?.method === 'websocket' &&
+      sub.transport?.session_id !== sessionId
+    );
+
+    if (subsToDelete.length > 0) {
+      await Promise.all(
+        subsToDelete.map(sub =>
+          fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+            method: 'DELETE',
+            headers: twitchHeaders
+          })
+        )
+      );
+    }
+
+    // Cria as novas inscrições para a sessão atual
+    const results = [];
+    for (const type of typesToSubscribe) {
+      const alreadyActive = existingSubs.some(
+        sub =>
+          sub.type === type &&
+          sub.status === 'enabled' &&
+          sub.transport?.session_id === sessionId
+      );
+
+      if (alreadyActive) {
+        results.push({ type, status: 'already_subscribed' });
+        continue;
+      }
+
+      const subRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: clientId,
-          client_secret: clientSecret
+        headers: twitchHeaders,
+        body: JSON.stringify({
+          type,
+          version: '1',
+          condition: { broadcaster_user_id: broadcasterId },
+          transport: { method: 'websocket', session_id: sessionId }
         })
       });
 
-      const refreshData = await refreshRes.json();
-
-      if (refreshRes.ok && refreshData.access_token) {
-        console.log('✅ Novo Access Token gerado com sucesso via Refresh Token!');
-        cachedAccessToken = refreshData.access_token;
-        return refreshData.access_token;
-      } else {
-        console.error('❌ Erro ao renovar com Refresh Token:', refreshData);
+      if (subRes.status === 429) {
+        return res.status(429).json({
+          error: `Rate limit da Twitch ao inscrever em ${type}.`,
+          subscribedSoFar: results
+        });
       }
-    } catch (err) {
-      console.error('❌ Erro de rede na renovação do token:', err);
-    }
-  }
 
-  // Retorna o token original em memória se a renovação falhar
-  return currentToken;
-}
+      const subData = await subRes.json();
+      if (!subRes.ok) {
+        return res.status(subRes.status).json({
+          error: subData.message || `Erro ao inscrever em ${type}`,
+          details: subData
+        });
+      }
 
-export default async function handler(req, res) {
-  // Configuração de CORS (permite requisições do seu frontend)
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
-  // Responde imediatamente a requisições de preflight (OPTIONS)
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Apenas aceita chamadas do tipo POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido. Utilize POST.' });
-  }
-
-  const { sessionId, eventType } = req.body || {};
-
-  // Validação basica de entrada
-  if (!sessionId || !eventType) {
-    return res.status(400).json({ 
-      error: 'Parâmetros ausentes. Forneça sessionId e eventType no corpo da requisição.' 
-    });
-  }
-
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const broadcasterId = process.env.TWITCH_BROADCASTER_ID;
-
-  if (!clientId || !broadcasterId) {
-    return res.status(500).json({ 
-      error: 'Variáveis de ambiente TWITCH_CLIENT_ID ou TWITCH_BROADCASTER_ID não configuradas na Vercel.' 
-    });
-  }
-
-  try {
-    // Obter um Access Token válido (auto-refreshed se necessário)
-    const token = await getValidAccessToken();
-
-    // Faz a inscrição do evento EventSub diretamente na API Helix da Twitch
-    const twitchRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
-      method: 'POST',
-      headers: {
-        'Client-ID': clientId,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        type: eventType,
-        version: '1',
-        condition: {
-          broadcaster_user_id: broadcasterId
-        },
-        transport: {
-          method: 'websocket',
-          session_id: sessionId
-        }
-      })
-    });
-
-    const data = await twitchRes.json();
-
-    if (!twitchRes.ok) {
-      console.error(`❌ Erro da API da Twitch (${twitchRes.status}):`, data);
-      return res.status(twitchRes.status).json(data);
+      results.push({ type, status: 'subscribed', id: subData.data?.[0]?.id });
     }
 
-    console.log(`📡 Inscrição concluída com sucesso para o evento ${eventType}`);
-    return res.status(200).json(data);
-
-  } catch (error) {
-    console.error('❌ Erro interno no servidor:', error);
-    return res.status(500).json({ 
-      error: 'Erro interno ao processar a inscrição na Twitch.',
-      details: error.message 
+    return res.status(200).json({
+      ok: true,
+      cleanedCount: subsToDelete.length,
+      subscriptions: results
     });
+  } catch (err) {
+    console.error('Erro no /api/subscribe:', err);
+    return res.status(500).json({ error: 'Erro interno ao gerenciar inscrições da Twitch.' });
   }
 }
