@@ -76,7 +76,7 @@ function cancelPrediction() {
   resetStateMachine('CANCELLED');
   updateState({ status: 'CANCELLED', remainingTime: 0, winningOptionId: null, isVisible: true });
   showToast('Palpite cancelado!');
-  scheduleAutoHide(3000);
+  scheduleAutoHide(5000); // Some após 5s
 }
 
 function addVotes(optionId, amount) {
@@ -167,6 +167,7 @@ function resolvePrediction(winnerId) {
 
   triggerConfetti();
   showToast('Palpite Encerrado!');
+  scheduleAutoHide(15000); // Some após 15s
 }
 
 function simulateHeavyResult() {

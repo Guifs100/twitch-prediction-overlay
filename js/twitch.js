@@ -292,6 +292,10 @@ function handleTwitchPredictionNotification(type, event) {
     if (status === 'RESOLVED') {
       uiHooks.onWinnerConfetti();
       uiHooks.onToast('Palpite Encerrado!');
+      scheduleAutoHide(15000); // Some 15s após exibir o resultado
+    } else {
+      uiHooks.onToast('Palpite Cancelado!');
+      scheduleAutoHide(5000); // Some 5s após exibir o aviso de cancelado
     }
   }
 }
