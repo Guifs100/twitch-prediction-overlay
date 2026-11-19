@@ -21,26 +21,68 @@ export default async function handler(req, res) {
         ];
 
   const clientId = process.env.TWITCH_CLIENT_ID;
-  const accessToken = process.env.TWITCH_ACCESS_TOKEN;
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+  const refreshToken = process.env.TWITCH_REFRESH_TOKEN;
   const broadcasterId = process.env.TWITCH_BROADCASTER_ID;
+  let accessToken = process.env.TWITCH_OAUTH_TOKEN;
 
-  if (!clientId || !accessToken || !broadcasterId) {
+  if (!clientId || !broadcasterId || (!accessToken && !refreshToken)) {
     return res.status(500).json({
-      error: 'Variáveis TWITCH_CLIENT_ID, TWITCH_ACCESS_TOKEN ou TWITCH_BROADCASTER_ID ausentes.'
+      error: 'Variáveis de ambiente TWITCH_CLIENT_ID, TWITCH_BROADCASTER_ID ou TWITCH_OAUTH_TOKEN ausentes na Vercel.'
     });
   }
 
-  const twitchHeaders = {
-    'Client-ID': clientId,
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
-  };
+  // Função auxiliar para renovar o token caso o TWITCH_OAUTH_TOKEN tenha expirado
+  async function renewAccessToken() {
+    if (!clientSecret || !refreshToken) return null;
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken
+    });
+
+    const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    if (!tokenRes.ok) return null;
+    const tokenData = await tokenRes.json();
+    return tokenData.access_token || null;
+  }
+
+  function getHeaders(token) {
+    return {
+      'Client-ID': clientId,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }
 
   try {
-    const listRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+    // 1. Busca todas as inscrições EventSub atuais
+    let listRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
       method: 'GET',
-      headers: twitchHeaders
+      headers: getHeaders(accessToken)
     });
+
+    // Se o token expirou (401), renova automaticamente via TWITCH_REFRESH_TOKEN e tenta novamente
+    if (listRes.status === 401) {
+      const newToken = await renewAccessToken();
+      if (!newToken) {
+        return res.status(401).json({
+          error: 'TWITCH_OAUTH_TOKEN expirado e não foi possível renovar com TWITCH_REFRESH_TOKEN.'
+        });
+      }
+      accessToken = newToken;
+      listRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+        method: 'GET',
+        headers: getHeaders(accessToken)
+      });
+    }
 
     if (listRes.status === 429) {
       return res.status(429).json({ error: 'Rate limit da Twitch ao listar inscrições.' });
@@ -49,7 +91,7 @@ export default async function handler(req, res) {
     const listData = await listRes.json();
     const existingSubs = listData.data || [];
 
-    // Remove inscrições antigas dos mesmos eventos de outras sessões WebSocket
+    // 2. Remove inscrições antigas dos mesmos eventos de outras sessões WebSocket
     const subsToDelete = existingSubs.filter(sub =>
       typesToSubscribe.includes(sub.type) &&
       sub.transport?.method === 'websocket' &&
@@ -61,13 +103,13 @@ export default async function handler(req, res) {
         subsToDelete.map(sub =>
           fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
             method: 'DELETE',
-            headers: twitchHeaders
+            headers: getHeaders(accessToken)
           })
         )
       );
     }
 
-    // Cria as novas inscrições para a sessão atual
+    // 3. Cria as novas inscrições para a sessão atual
     const results = [];
     for (const type of typesToSubscribe) {
       const alreadyActive = existingSubs.some(
@@ -84,7 +126,7 @@ export default async function handler(req, res) {
 
       const subRes = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
         method: 'POST',
-        headers: twitchHeaders,
+        headers: getHeaders(accessToken),
         body: JSON.stringify({
           type,
           version: '1',
