@@ -27,7 +27,7 @@ import {
 function renderAll(state = getState()) {
   renderControls(state);
   renderOverlayWidget(state);
-  initPingPongScroll(state);
+  initPingPongScroll();
 }
 
 function handleStartPrediction(e) {
@@ -76,7 +76,7 @@ function cancelPrediction() {
   resetStateMachine('CANCELLED');
   updateState({ status: 'CANCELLED', remainingTime: 0, winningOptionId: null, isVisible: true });
   showToast('Palpite cancelado!');
-  scheduleAutoHide(5000); // Some após 5s
+  scheduleAutoHide(5000);
 }
 
 function addVotes(optionId, amount) {
@@ -167,7 +167,7 @@ function resolvePrediction(winnerId) {
 
   triggerConfetti();
   showToast('Palpite Encerrado!');
-  scheduleAutoHide(15000); // Some após 15s
+  scheduleAutoHide(15000);
 }
 
 function simulateHeavyResult() {
@@ -194,14 +194,12 @@ function bindEvents() {
   document.getElementById('btn-sim-10')?.addEventListener('click', simulate10OptionsScenario);
   document.getElementById('btn-sim-heavy')?.addEventListener('click', simulateHeavyResult);
 
-  // Botões de tempo rápido
   document.querySelectorAll('[data-timer-preset]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.getElementById('input-timer').value = btn.dataset.timerPreset;
     });
   });
 
-  // Botões de preset de opções
   document.querySelectorAll('[data-option-preset]').forEach(btn => {
     btn.addEventListener('click', () => {
       const count = parseInt(btn.dataset.optionPreset, 10);
@@ -209,7 +207,6 @@ function bindEvents() {
     });
   });
 
-  // Delegação de eventos dinâmicos (remover opção, simular voto, escolher vencedor)
   document.addEventListener('click', (e) => {
     const removeBtn = e.target.closest('[data-remove-option]');
     if (removeBtn) {

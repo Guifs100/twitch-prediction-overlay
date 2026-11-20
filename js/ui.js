@@ -1,5 +1,5 @@
 import { OPTION_COLORS } from './config.js';
-import { getState, scheduleAutoHide } from './state.js';
+import { getState } from './state.js';
 
 export function escapeHtml(str) {
   if (!str) return '';
@@ -234,7 +234,9 @@ export function renderOverlayWidget(state = getState()) {
     const top3WinnersHTML = top3Winners
       .map((p, idx) => {
         const rank = idx + 1;
-        const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || p.points * 2;
+        const totalGanhos = p.won > 0
+          ? p.won
+          : (winnerVotes > 0 ? Math.round((p.points / winnerVotes) * totalVotes) : p.points);
         const lucroLiquido = Math.max(0, totalGanhos - p.points);
 
         let badgeColor = 'bg-amber-400 text-black border-amber-300';
@@ -267,7 +269,9 @@ export function renderOverlayWidget(state = getState()) {
       const listItems = restWinners
         .map((p, i) => {
           const rank = i + 4;
-          const totalGanhos = p.won || Math.round((p.points / (winnerVotes || 1)) * totalVotes) || p.points * 2;
+          const totalGanhos = p.won > 0
+            ? p.won
+            : (winnerVotes > 0 ? Math.round((p.points / winnerVotes) * totalVotes) : p.points);
           return `
             <div class="inline-flex items-center gap-1.5 bg-emerald-950/95 border border-emerald-500/50 px-3 py-1 rounded-lg text-xs md:text-sm whitespace-nowrap shrink-0 shadow">
               <strong class="text-emerald-400 text-xs md:text-sm">${rank}º</strong>
@@ -283,24 +287,29 @@ export function renderOverlayWidget(state = getState()) {
         </div>`;
     }
 
-    const loserPredictors = loserOptions.flatMap(o => o.topPredictors || []);
-    const sortedLosers = [...loserPredictors].sort((a, b) => (b.points || b.lost) - (a.points || a.lost));
+    const loserPredictors = loserOptions.flatMap(o =>
+      (o.topPredictors || []).map(p => ({
+        name: p.name,
+        points: Number(p.points || p.lost || 0),
+        optionTitle: o.title
+      }))
+    );
+    const sortedLosers = [...loserPredictors].sort((a, b) => b.points - a.points);
     const top3Losers = sortedLosers.slice(0, 3);
     const restLosers = sortedLosers.slice(3);
 
     const top3LosersHTML = top3Losers
       .map((p, idx) => {
         const rank = idx + 1;
-        const lostPts = p.points || p.lost || 0;
         return `
           <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 text-sm md:text-base bg-red-950/60 border border-red-500/40 px-3.5 py-2 rounded-xl shadow-md">
             <div class="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-900/90 text-red-200 border border-red-500/50 font-black text-xs md:text-sm flex items-center justify-center shrink-0">${rank}º</div>
             <div class="min-w-0">
               <div class="font-bold text-gray-100 truncate text-xs md:text-base">${escapeHtml(p.name)}</div>
-              <div class="text-[11px] md:text-xs text-gray-400 truncate">Perdeu aposta</div>
+              <div class="text-[11px] md:text-xs text-gray-400 truncate">Apostou em: ${escapeHtml(p.optionTitle || 'Outra opção')}</div>
             </div>
             <div class="text-right whitespace-nowrap pl-2">
-              <span class="font-extrabold text-red-400 block text-xs md:text-base">-${lostPts.toLocaleString('pt-BR')} pts</span>
+              <span class="font-extrabold text-red-400 block text-xs md:text-base">-${p.points.toLocaleString('pt-BR')} pts</span>
             </div>
           </div>`;
       })
@@ -311,12 +320,11 @@ export function renderOverlayWidget(state = getState()) {
       const listItems = restLosers
         .map((p, i) => {
           const rank = i + 4;
-          const lostPts = p.points || p.lost || 0;
           return `
             <div class="inline-flex items-center gap-1.5 bg-red-950/80 border border-red-500/40 px-3 py-1 rounded-lg text-xs md:text-sm whitespace-nowrap shrink-0 shadow">
               <strong class="text-red-400 text-xs md:text-sm">${rank}º</strong>
               <span class="text-gray-200 font-bold">${escapeHtml(p.name)}</span>
-              <span class="text-red-400 font-extrabold">-${lostPts.toLocaleString('pt-BR')} pts</span>
+              <span class="text-red-400 font-extrabold">-${p.points.toLocaleString('pt-BR')} pts</span>
             </div>`;
         })
         .join('');
@@ -481,24 +489,16 @@ export function renderOverlayWidget(state = getState()) {
   refreshIcons();
 }
 
-export function initPingPongScroll(state = getState()) {
+export function initPingPongScroll() {
   setTimeout(() => {
     const containers = document.querySelectorAll('[data-pingpong]');
     if (containers.length === 0) return;
-
-    let longestContainer = null;
-    let maxScrollDistance = 0;
 
     containers.forEach(container => {
       const track = container.querySelector('.auto-scroll-track');
       if (!track) return;
 
       const dist = track.scrollWidth - container.clientWidth + 16;
-      if (dist > maxScrollDistance) {
-        maxScrollDistance = dist;
-        longestContainer = container;
-      }
-
       if (dist <= 0) return;
 
       let pos = 0;
@@ -528,13 +528,6 @@ export function initPingPongScroll(state = getState()) {
           isWaiting = true;
           track.style.transform = `translateX(-${pos}px)`;
 
-          if (container._hasCompletedCycle === false && container === longestContainer) {
-            container._hasCompletedCycle = true;
-            if (state.status === 'RESOLVED' || state.status === 'CANCELLED') {
-              scheduleAutoHide(15000);
-            }
-          }
-
           setTimeout(() => {
             isWaiting = false;
             container._animId = requestAnimationFrame(step);
@@ -546,13 +539,8 @@ export function initPingPongScroll(state = getState()) {
         container._animId = requestAnimationFrame(step);
       }
 
-      container._hasCompletedCycle = false;
       if (container._animId) cancelAnimationFrame(container._animId);
       container._animId = requestAnimationFrame(step);
     });
-
-    if (maxScrollDistance <= 0 && (state.status === 'RESOLVED' || state.status === 'CANCELLED')) {
-      scheduleAutoHide(15000);
-    }
   }, 200);
 }

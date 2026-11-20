@@ -143,21 +143,51 @@ async function subscribeAllEventsWithRetry(sessionId, eventTypes, attempt = 1) {
   }
 }
 
+function mapTwitchOutcomes(outcomes = [], existingOptions = [], winningId = null) {
+  return outcomes.map((o, idx) => {
+    const prevOpt = existingOptions.find(prev => prev.twitchId && prev.twitchId === o.id) || existingOptions[idx];
+    const isWinnerOpt = Boolean(winningId && o.id === winningId);
+
+    let predictors = [];
+    if (Array.isArray(o.top_predictors) && o.top_predictors.length > 0) {
+      predictors = o.top_predictors.map(p => {
+        const used = Number(p.channel_points_used) || 0;
+        const won = p.channel_points_won != null ? Number(p.channel_points_won) : 0;
+        return {
+          userId: p.user_id || '',
+          name: p.user_name || p.user_login || 'Usuário',
+          points: used,
+          won: isWinnerOpt ? won : 0,
+          lost: isWinnerOpt ? 0 : used
+        };
+      });
+    } else if (prevOpt && Array.isArray(prevOpt.topPredictors)) {
+      predictors = prevOpt.topPredictors.map(p => ({
+        ...p,
+        won: isWinnerOpt ? (p.won || 0) : 0,
+        lost: isWinnerOpt ? 0 : (p.points || 0)
+      }));
+    }
+
+    return {
+      id: prevOpt ? prevOpt.id : String(idx + 1),
+      twitchId: o.id || (prevOpt ? prevOpt.twitchId : ''),
+      title: o.title || (prevOpt ? prevOpt.title : `Opção ${idx + 1}`),
+      votes: Number(o.channel_points ?? prevOpt?.votes ?? 0),
+      usersCount: Number(o.users ?? prevOpt?.usersCount ?? 0),
+      color: prevOpt ? prevOpt.color : OPTION_COLORS[idx % OPTION_COLORS.length],
+      topPredictors: predictors
+    };
+  });
+}
+
 function handleTwitchPredictionNotification(type, event) {
   const currentState = getState();
 
   if (type === 'channel.prediction.begin') {
     resetStateMachine('ACTIVE');
 
-    const mappedOptions = (event.outcomes || []).map((o, idx) => ({
-      id: String(idx + 1),
-      twitchId: o.id || '',
-      title: o.title,
-      votes: o.channel_points || 0,
-      usersCount: o.users || 0,
-      color: OPTION_COLORS[idx % OPTION_COLORS.length],
-      topPredictors: []
-    }));
+    const mappedOptions = mapTwitchOutcomes(event.outcomes || [], [], null);
 
     let remainingSecs = 120;
     if (event.locks_at) {
@@ -180,21 +210,7 @@ function handleTwitchPredictionNotification(type, event) {
   }
 
   if (type === 'channel.prediction.progress') {
-    const mappedOptions = (event.outcomes || []).map((o, idx) => ({
-      id: String(idx + 1),
-      twitchId: o.id || '',
-      title: o.title,
-      votes: o.channel_points || 0,
-      usersCount: o.users || 0,
-      color: OPTION_COLORS[idx % OPTION_COLORS.length],
-      topPredictors: o.top_predictors
-        ? o.top_predictors.map(p => ({
-            name: p.user_name || p.user_login || 'Usuário',
-            points: p.channel_points_used || 0,
-            won: p.channel_points_won || 0
-          }))
-        : []
-    }));
+    const mappedOptions = mapTwitchOutcomes(event.outcomes || [], currentState.options, null);
 
     let remainingSecs = currentState.remainingTime;
     if (event.locks_at && currentState.status === 'ACTIVE') {
@@ -205,7 +221,7 @@ function handleTwitchPredictionNotification(type, event) {
     const nextStatus = currentState.status === 'IDLE' ? 'ACTIVE' : currentState.status;
 
     updateState({
-      title: event.title,
+      title: event.title || currentState.title,
       status: nextStatus,
       remainingTime: remainingSecs,
       isVisible: true,
@@ -219,9 +235,15 @@ function handleTwitchPredictionNotification(type, event) {
 
   if (type === 'channel.prediction.lock') {
     stopTimer();
+    const mappedOptions = event.outcomes
+      ? mapTwitchOutcomes(event.outcomes, currentState.options, null)
+      : currentState.options;
+
     updateState({
+      title: event.title || currentState.title,
       status: 'LOCKED',
       remainingTime: 0,
+      options: mappedOptions,
       isVisible: true
     });
     uiHooks.onToast('Votações encerradas!');
@@ -232,53 +254,21 @@ function handleTwitchPredictionNotification(type, event) {
     stopTimer();
     clearAutoHide();
 
-    const winningId = event.winning_outcome_id;
+    const winningTwitchId = event.winning_outcome_id || null;
     const rawStatus = String(event.status || '').toUpperCase();
-    const isResolved = rawStatus === 'RESOLVED' || Boolean(winningId);
+    const isResolved = rawStatus === 'RESOLVED' || Boolean(winningTwitchId);
     const status = isResolved ? 'RESOLVED' : 'CANCELLED';
 
-    let baseOptions = currentState.options;
-    if (!baseOptions || baseOptions.length === 0) {
-      baseOptions = (event.outcomes || []).map((o, idx) => ({
-        id: String(idx + 1),
-        twitchId: o.id || '',
-        title: o.title,
-        votes: o.channel_points || 0,
-        usersCount: o.users || 0,
-        color: OPTION_COLORS[idx % OPTION_COLORS.length],
-        topPredictors: []
-      }));
-    }
-
-    const winnerOpt = baseOptions.find(
-      o => (o.twitchId && o.twitchId === winningId) || o.id === String(winningId)
+    const updatedOptions = mapTwitchOutcomes(
+      event.outcomes || [],
+      currentState.options,
+      winningTwitchId
     );
-    const resolvedWinnerId = winnerOpt ? winnerOpt.id : (winningId ? String(winningId) : null);
 
-    const updatedOptions = baseOptions.map((opt, idx) => {
-      const twitchOutcome = event.outcomes
-        ? event.outcomes.find(o => o.id === opt.twitchId || String(idx + 1) === opt.id)
-        : null;
-
-      const isWinnerOpt = opt.id === resolvedWinnerId || opt.twitchId === winningId;
-
-      let predictors = [];
-      if (twitchOutcome && twitchOutcome.top_predictors) {
-        predictors = twitchOutcome.top_predictors.map(p => ({
-          name: p.user_name || p.user_login || 'Usuário',
-          points: p.channel_points_used || 0,
-          won: p.channel_points_won || 0,
-          lost: isWinnerOpt ? 0 : (p.channel_points_used || 0)
-        }));
-      }
-
-      return {
-        ...opt,
-        votes: twitchOutcome ? (twitchOutcome.channel_points || opt.votes) : opt.votes,
-        usersCount: twitchOutcome ? (twitchOutcome.users || opt.usersCount) : opt.usersCount,
-        topPredictors: predictors
-      };
-    });
+    const winnerOpt = updatedOptions.find(
+      o => (winningTwitchId && o.twitchId === winningTwitchId) || o.id === String(winningTwitchId)
+    );
+    const resolvedWinnerId = winnerOpt ? winnerOpt.id : null;
 
     updateState({
       title: event.title || currentState.title,
@@ -292,10 +282,10 @@ function handleTwitchPredictionNotification(type, event) {
     if (status === 'RESOLVED') {
       uiHooks.onWinnerConfetti();
       uiHooks.onToast('Palpite Encerrado!');
-      scheduleAutoHide(15000); // Some 15s após exibir o resultado
+      scheduleAutoHide(15000);
     } else {
       uiHooks.onToast('Palpite Cancelado!');
-      scheduleAutoHide(5000); // Some 5s após exibir o aviso de cancelado
+      scheduleAutoHide(5000);
     }
   }
 }
