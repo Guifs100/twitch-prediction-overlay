@@ -189,7 +189,6 @@ export function renderOverlayWidget(state = getState()) {
   const winnerVotes = winnerOption ? winnerOption.votes : 0;
 
   const returnRatio = winnerVotes > 0 ? (totalVotes / winnerVotes).toFixed(2) : '1.00';
-  const returnPer1k = Math.round(1000 * parseFloat(returnRatio));
 
   const progressBarSegments = state.options
     .map(opt => {
@@ -346,10 +345,6 @@ export function renderOverlayWidget(state = getState()) {
               <div class="text-xs uppercase font-extrabold text-emerald-400 tracking-wider whitespace-nowrap">Resultado da Distribuição</div>
               <div class="text-xs md:text-base text-white font-semibold">Vencedor: <strong class="text-emerald-300 uppercase">${escapeHtml(winnerOption.title)}</strong> (${winnerOption.usersCount || 0} apostadores)</div>
             </div>
-          </div>
-          <div class="bg-black/60 border border-emerald-500/40 px-3 py-1 rounded-xl text-right whitespace-nowrap shadow">
-            <div class="text-[10px] md:text-xs text-gray-300 font-bold uppercase">Retorno p/ 1k pts</div>
-            <div class="text-sm md:text-base font-black text-emerald-400 font-display">+${returnPer1k.toLocaleString('pt-BR')} pts</div>
           </div>
         </div>
 
