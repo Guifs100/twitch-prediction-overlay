@@ -40,7 +40,6 @@ Um overlay de palpites (Predictions) em tempo real para transmissões na Twitch,
   * `app.js`: Máquina de estados, conexão WebSocket, renderização e motor de animação Ping-Pong.
 
 ### 2. Testes Automatizados
-* **Testes Unitários:** Implementar testes em Vitest para os cálculos matemáticos de distribuição de pontos, lucro líquido e taxa de retorno por 1.000 pontos (`returnPer1k`).
 * **Testes E2E:** Simular payloads de eventos da Twitch para validar a robustez da máquina de estados (`IDLE`, `ACTIVE`, `LOCKED`, `RESOLVED`, `CANCELLED`).
 
 ### 3. Customização Avançada
